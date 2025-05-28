@@ -163,7 +163,6 @@ async function connectAndStartServer() {
     const distFrontendPath = path.join(process.cwd(), 'dist_frontend');
     console.log(`Serving static assets from ${distFrontendPath} at /dist_frontend`);
 
-    // ADDED LOGGING FOR STATIC ASSET REQUESTS
     app.use('/dist_frontend',
       (req: Request, res: Response, next: NextFunction) => {
         console.log(`[STATIC_PRE_LOG] Request to /dist_frontend: ${req.method} ${req.path}, Original URL: ${req.originalUrl}`);
@@ -171,8 +170,20 @@ async function connectAndStartServer() {
       },
       express.static(distFrontendPath, {
         setHeaders: (res, filePath, stat) => {
-          // This log confirms express.static *is* serving the file
-          console.log(`[EXPRESS_STATIC_SERVE] Serving: ${filePath} with Content-Type: ${res.getHeader('Content-Type')}`);
+          if (filePath.endsWith('.js')) {
+            const currentContentType = res.getHeader('Content-Type');
+            // Common JS MIME types
+            const jsMimeTypes = ['application/javascript', 'text/javascript'];
+            // Check if currentContentType is a string and one of the JS MIME types
+            if (typeof currentContentType !== 'string' || !jsMimeTypes.some(type => currentContentType.startsWith(type))) {
+              res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+              console.log(`[EXPRESS_STATIC_JS_MIME_FIX] Set Content-Type for ${filePath} to application/javascript; charset=utf-8 (was: ${currentContentType})`);
+            } else {
+              console.log(`[EXPRESS_STATIC_JS_MIME_OK] Content-Type for ${filePath} already OK: ${currentContentType}`);
+            }
+          }
+          // General log for any file served by express.static
+          console.log(`[EXPRESS_STATIC_SERVE_FINAL] Serving: ${filePath} with final Content-Type: ${res.getHeader('Content-Type')}`);
         }
       })
     );
@@ -257,4 +268,3 @@ async function connectAndStartServer() {
 }
 
 connectAndStartServer();
-    

@@ -271,11 +271,11 @@ const App: React.FC = () => {
             <section className="text-center py-6">
               <Button
                 onClick={handleGeneratePackage}
-                disabled={isGeneratingPackage || !canGenerate || isAnalyzingPhotos}
+                disabled={isGeneratingPackage || !canGenerate}
                 variant="primary"
                 size="large"
                 aria-label="Generate social media image package"
-                title={isAnalyzingPhotos ? "Please wait for photo analysis to complete." : ""}
+                title={!canGenerate ? "Please select images and branding." : ""}
               >
                 {isGeneratingPackage ? (
                   <>
@@ -284,6 +284,9 @@ const App: React.FC = () => {
                   </>
                 ) : "Generate Social Media Package"}
               </Button>
+              {isAnalyzingPhotos && (
+                 <p className="text-xs text-slate-500 mt-2">Photo analysis in progress in the background...</p>
+              )}
             </section>
 
             {isGeneratingPackage && !processedImagePackage && ( 

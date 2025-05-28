@@ -2,7 +2,7 @@
 import type { Agent, Team } from '../types';
 // import { appConfig } from '../config'; // No longer needed for DB details
 
-const API_BASE_URL = 'http://localhost:3001/api'; // Assuming backend runs on port 3001
+const API_BASE_URL = 'https://fl.kelownarealestate.com/api';
 
 export const fetchAgents = async (): Promise<Agent[]> => {
   console.log(`Fetching agents from backend API`);

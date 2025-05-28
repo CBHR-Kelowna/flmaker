@@ -2,8 +2,8 @@
 import type { Listing } from '../types';
 // import { appConfig } from '../config'; // No longer needed for DB details
 
-// Base URL for the API. Adjust if your frontend and backend are on different ports/domains in production.
-const API_BASE_URL = 'http://localhost:3001/api'; // Assuming backend runs on port 3001
+// Base URL for the API.
+const API_BASE_URL = 'https://fl.kelownarealestate.com/api';
 
 export const fetchListing = async (mlsId: string): Promise<Listing> => {
   console.log(`Fetching listing for MLS ID: ${mlsId} from backend API`);

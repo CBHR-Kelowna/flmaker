@@ -31,19 +31,22 @@ const allowedOrigins = [
   'http://localhost:8080', 
   'http://127.0.0.1:5500',
   `http://localhost:${port}`, // Allow requests from the same origin the server is running on
-  `http://127.0.0.1:${port}`
+  `http://127.0.0.1:${port}`,
+  'http://15.223.66.150', // Allow your Lightsail IP directly
+  'http://15.223.66.150:3001' // Allow your Lightsail IP with port
 ];
 
 const corsOptions: CorsOptions = {
   origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!requestOrigin) { // For requests with no origin (like curl, mobile apps, or server-to-server)
+    if (!requestOrigin) { 
       console.warn("CORS: Request has no origin. Allowing for development purposes.");
       return callback(null, true);
     }
-    if (allowedOrigins.includes(requestOrigin)) {
+    if (allowedOrigins.some(origin => requestOrigin.startsWith(origin))) { // Check if requestOrigin starts with any allowed origin
       callback(null, true);
     } else {
-      console.warn(`CORS: Origin '${requestOrigin}' not in allowedOrigins. Allowing for development purposes.`);
+      // Temporarily allow all for easier debugging, but tighten this in production
+      console.warn(`CORS: Origin '${requestOrigin}' not in allowedOrigins. Allowing for debugging purposes.`);
       callback(null, true); 
     }
   },
@@ -158,8 +161,22 @@ async function connectAndStartServer() {
     
     // Serve static assets from dist_frontend (for /dist_frontend/index.js etc.)
     const distFrontendPath = path.join(process.cwd(), 'dist_frontend');
-    app.use('/dist_frontend', express.static(distFrontendPath));
     console.log(`Serving static assets from ${distFrontendPath} at /dist_frontend`);
+
+    // ADDED LOGGING FOR STATIC ASSET REQUESTS
+    app.use('/dist_frontend',
+      (req: Request, res: Response, next: NextFunction) => {
+        console.log(`[STATIC_PRE_LOG] Request to /dist_frontend: ${req.method} ${req.path}, Original URL: ${req.originalUrl}`);
+        next();
+      },
+      express.static(distFrontendPath, {
+        setHeaders: (res, filePath, stat) => {
+          // This log confirms express.static *is* serving the file
+          console.log(`[EXPRESS_STATIC_SERVE] Serving: ${filePath} with Content-Type: ${res.getHeader('Content-Type')}`);
+        }
+      })
+    );
+
 
     // --- BEGIN DIAGNOSTIC CHECK ---
     const mainScriptPath = path.join(distFrontendPath, 'index.js');
@@ -184,6 +201,12 @@ async function connectAndStartServer() {
     app.get('*', (req: Request, res: Response, next: NextFunction) => {
       if (req.path.startsWith('/api/')) {
         return next(); // Pass to API 404 handler or other API middleware
+      }
+      // Log if we are serving index.html for an asset path
+      if (req.path.startsWith('/dist_frontend/')) {
+        console.warn(`[SPA_FALLBACK_WARN] Serving index.html for ASSET path: ${req.path}`);
+      } else {
+        console.log(`[SPA_FALLBACK] Serving index.html for general path: ${req.path}`);
       }
       res.sendFile(indexPath, (err) => {
         if (err) {

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Realty Social Packager</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sky: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              200: '#bae6fd',
+              300: '#7dd3fc',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
+              950: '#082f49',
+            },
+            slate: {
+              50: '#f8fafc',
+              100: '#f1f5f9',
+              200: '#e2e8f0',
+              300: '#cbd5e1',
+              400: '#94a3b8',
+              500: '#64748b',
+              600: '#475569',
+              700: '#334155',
+              800: '#1e293b',
+              900: '#0f172a',
+              950: '#020617',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Uploadcare Widget -->
+  <script src="https://ucarecdn.com/libs/widget/3.x/uploadcare.full.min.js" charset="utf-8"></script>
+  <script>
+    UPLOADCARE_PUBLIC_KEY = 'demopublickey';
+    UPLOADCARE_IMAGES_ONLY = true; // Optional: ensures widget focuses on images
+    // UPLOADCARE_MANUAL_START = true; // If we wanted to prevent UI widget auto-init
+  </script>
+
+  <!-- Jimp Library -->
+  <script src="https://cdn.jsdelivr.net/npm/jimp@0.22.10/browser/lib/jimp.min.js"></script>
+
+  <!-- Import Map with consistent React 19.1.0 -->
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.1.0",
+    "react/jsx-runtime": "https://esm.sh/react@19.1.0/jsx-runtime",
+    "react-dom": "https://esm.sh/react-dom@19.1.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.1.0/client",
+    "react-easy-crop": "https://esm.sh/react-easy-crop@5.0.7",
+    "jszip": "https://esm.sh/jszip@3.10.1",
+    "file-saver": "https://esm.sh/file-saver@2.0.5",
+    "express": "https://esm.sh/express@5.1.0",
+    "mongodb": "https://esm.sh/mongodb@6.16.0",
+    "cors": "https://esm.sh/cors@2.8.5",
+    "path": "https://esm.sh/path@0.12.7",
+    "dotenv": "https://esm.sh/dotenv@16.5.0",
+    "process": "https://esm.sh/process@0.11.10",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "fs": "https://esm.sh/fs@^0.0.1-security"
+  }
+}
+</script>
+</head>
+<body class="bg-slate-100">
+  <div id="root"></div>
+
+  <!-- Your main frontend app -->
+  <script type="module" src="/dist_frontend/index.js"></script>
+</body>
+</html><link rel="stylesheet" href="index.css">
+<script src="index.tsx" type="module"></script>

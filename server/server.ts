@@ -169,12 +169,11 @@ async function connectAndStartServer() {
         next();
       },
       express.static(distFrontendPath, {
+        extensions: ['js'], // Automatically look for .js if file not found (e.g., /App -> /App.js)
         setHeaders: (res, filePath, stat) => {
           if (filePath.endsWith('.js')) {
             const currentContentType = res.getHeader('Content-Type');
-            // Common JS MIME types
             const jsMimeTypes = ['application/javascript', 'text/javascript'];
-            // Check if currentContentType is a string and one of the JS MIME types
             if (typeof currentContentType !== 'string' || !jsMimeTypes.some(type => currentContentType.startsWith(type))) {
               res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
               console.log(`[EXPRESS_STATIC_JS_MIME_FIX] Set Content-Type for ${filePath} to application/javascript; charset=utf-8 (was: ${currentContentType})`);
@@ -182,7 +181,6 @@ async function connectAndStartServer() {
               console.log(`[EXPRESS_STATIC_JS_MIME_OK] Content-Type for ${filePath} already OK: ${currentContentType}`);
             }
           }
-          // General log for any file served by express.static
           console.log(`[EXPRESS_STATIC_SERVE_FINAL] Serving: ${filePath} with final Content-Type: ${res.getHeader('Content-Type')}`);
         }
       })
@@ -214,11 +212,16 @@ async function connectAndStartServer() {
         return next(); // Pass to API 404 handler or other API middleware
       }
       // Log if we are serving index.html for an asset path
-      if (req.path.startsWith('/dist_frontend/')) {
-        console.warn(`[SPA_FALLBACK_WARN] Serving index.html for ASSET path: ${req.path}`);
-      } else {
-        console.log(`[SPA_FALLBACK] Serving index.html for general path: ${req.path}`);
+      // Check if the path does not have an extension or is an HTML file, and is not an API call
+      const hasExtension = req.path.includes('.');
+      const isLikelyAsset = hasExtension && !req.path.endsWith('.html');
+
+      if (isLikelyAsset && req.path.startsWith('/dist_frontend/')) { // Only warn for /dist_frontend paths specifically
+         console.warn(`[SPA_FALLBACK_WARN] Serving index.html for ASSET path: ${req.path}. This might indicate the asset was not found by express.static.`);
+      } else if (!isLikelyAsset) {
+         console.log(`[SPA_FALLBACK] Serving index.html for general path: ${req.path}`);
       }
+      
       res.sendFile(indexPath, (err) => {
         if (err) {
           console.error(`Error sending index.html for path ${req.path}. Tried path: ${indexPath}. CWD: ${process.cwd()}`, err);
@@ -268,3 +271,4 @@ async function connectAndStartServer() {
 }
 
 connectAndStartServer();
+    

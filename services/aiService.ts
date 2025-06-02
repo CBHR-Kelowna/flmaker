@@ -3,7 +3,7 @@ import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import type { Listing } from '../types';
 
 // New helper function to get formatted bed/bath string from structured listing data
-const getBedBathDisplayInfo = (listing: Listing): { 
+const getBedBathDisplayInfo = (listing: Listing): {
   bedBathTextFormatted: string | null; // For direct display e.g., "3 Beds | 2 Baths"
   bedsForPrompt: string; // For AI prompt e.g., "3 Beds" or "Not specified"
   bathsForPrompt: string; // For AI prompt e.g., "2 Baths" or "Not specified"
@@ -26,10 +26,10 @@ const getBedBathDisplayInfo = (listing: Listing): {
   // If neither beds nor baths are specified with positive counts,
   // assume not primarily residential or info not available.
   if (bedsCount === 0 && totalCalculatedBaths === 0) {
-    return { 
-      bedBathTextFormatted: null, 
-      bedsForPrompt: "Not specified", 
-      bathsForPrompt: "Not specified" 
+    return {
+      bedBathTextFormatted: null,
+      bedsForPrompt: "Not specified",
+      bathsForPrompt: "Not specified"
     };
   }
 
@@ -44,8 +44,8 @@ const getBedBathDisplayInfo = (listing: Listing): {
   } else if (bathsStrDisplay) {
     combinedText = bathsStrDisplay;
   }
-  
-  return { 
+
+  return {
     bedBathTextFormatted: combinedText,
     bedsForPrompt: bedsStrDisplay || "Not specified",
     bathsForPrompt: bathsStrDisplay || "Not specified"
@@ -84,7 +84,7 @@ Follow this structure and tone precisely:
 **Property Information to Use (for your reference during generation):**
 
 Property Address: "${address}"
-Bedrooms: "${bedsForPrompt}" 
+Bedrooms: "${bedsForPrompt}"
 Bathrooms: "${bathsForPrompt}"
 Agent's Name: "${agentName || 'Our Dedicated Team'}"
 City for Hashtags: "${listing.City}"
@@ -126,10 +126,23 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
       model: 'gemini-2.5-flash-preview-04-17',
       contents: prompt,
     });
-    return response.text;
+
+    const textContent = response.text;
+    if (typeof textContent === 'string') {
+      return textContent;
+    }
+    // This case implies an issue if text was expected from the API.
+    console.error('Gemini API response.text is undefined, expected a string.');
+    throw new Error('Failed to generate description: AI response was empty or malformed.');
+
   } catch (error) {
     console.error("Error calling Gemini API:", error);
     if (error instanceof Error) {
+        // If the error is already one of our specific messages, or a generic one, re-throw.
+        if (error.message.startsWith("Failed to generate description:") || error.message.startsWith("API_KEY is not configured")) {
+            throw error;
+        }
+        // Otherwise, wrap it to provide more context.
         throw new Error(`Failed to generate description: ${error.message}`);
     }
     throw new Error("Failed to generate description due to an unknown error.");

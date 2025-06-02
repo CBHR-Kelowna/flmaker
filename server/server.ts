@@ -1,5 +1,5 @@
 
-import express, { Express, Request as ExpressRequest, Response as ExpressResponse, NextFunction as ExpressNextFunction } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import { MongoClient, Db, Collection } from 'mongodb';
 import cors, { CorsOptions } from 'cors';
 import path from 'path';
@@ -18,7 +18,7 @@ try {
 }
 
 // Extend Express Request type to include user
-interface AuthenticatedRequest extends ExpressRequest {
+interface AuthenticatedRequest extends Request {
   user?: admin.auth.DecodedIdToken;
 }
 
@@ -85,7 +85,7 @@ if (!mongoUri || !dbName) {
 const client = new MongoClient(mongoUri!);
 
 // Firebase Authentication Middleware
-const authenticateToken = async (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => {
+const authenticateToken: express.RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
   const authReq = req as AuthenticatedRequest;
   const authHeader = authReq.headers.authorization;
 
@@ -129,7 +129,7 @@ async function connectAndStartServer() {
     app.use('/api', authenticateToken);
 
 
-    app.get('/api/listings/:mlsId', async (req: ExpressRequest, res: ExpressResponse) => {
+    app.get('/api/listings/:mlsId', async (req: Request, res: Response) => {
       const authReq = req as AuthenticatedRequest;
       const { mlsId } = authReq.params;
       console.log(`User ${authReq.user?.uid} requesting listing ${mlsId}`);
@@ -149,7 +149,7 @@ async function connectAndStartServer() {
       }
     });
 
-    app.get('/api/agents', async (req: ExpressRequest, res: ExpressResponse) => {
+    app.get('/api/agents', async (req: Request, res: Response) => {
         const authReq = req as AuthenticatedRequest;
         console.log(`User ${authReq.user?.uid} requesting agents`);
       if (!agentsCollection) {
@@ -168,7 +168,7 @@ async function connectAndStartServer() {
       }
     });
 
-    app.get('/api/teams', async (req: ExpressRequest, res: ExpressResponse) => {
+    app.get('/api/teams', async (req: Request, res: Response) => {
         const authReq = req as AuthenticatedRequest;
         console.log(`User ${authReq.user?.uid} requesting teams`);
       if (!teamsCollection) {
@@ -190,7 +190,7 @@ async function connectAndStartServer() {
     const distFrontendPath = path.join(process.cwd(), 'dist_frontend'); // Uses global process
     app.use('/dist_frontend', express.static(distFrontendPath, {
         extensions: ['js'],
-        setHeaders: (res: ExpressResponse, filePath: string) => { 
+        setHeaders: (res: Response, filePath: string) => { 
           if (filePath.endsWith('.js')) {
             res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
           }
@@ -206,7 +206,7 @@ async function connectAndStartServer() {
     }
 
     const indexPath = path.join(process.cwd(), 'index.html'); // Uses global process
-    app.get('*', (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => {
+    app.get('*', (req: Request, res: Response, next: NextFunction) => {
       if (req.path.startsWith('/api/')) {
         return next();
       }
@@ -220,11 +220,11 @@ async function connectAndStartServer() {
       });
     });
 
-    app.use('/api/*', (req: ExpressRequest, res: ExpressResponse) => {
+    app.use('/api/*', (req: Request, res: Response) => {
       res.status(404).json({ message: `API endpoint not found: ${req.method} ${req.originalUrl}` });
     });
 
-    app.use((err: Error, req: ExpressRequest, res: ExpressResponse, _next: ExpressNextFunction) => {
+    app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
       console.error("Unhandled error:", err.stack);
       if (res.headersSent) {
         return _next(err);

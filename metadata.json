@@ -1,6 +1,6 @@
 {
   "name": "Featured Listing Maker",
-  "description": "A web application to create social media image packages for real estate listings. Users can search for listings, select photos, edit them, add optional agent/team branding, and generate a package of images ready for social media.",
+  "description": "A web application for authenticated users to create social media image packages for real estate listings. Users can search for listings, select photos, edit them, add optional agent/team branding, and generate a package of images ready for social media. Includes a feature to generate Instagram-ready property descriptions using AI. Requires user login.",
   "requestFramePermissions": [],
   "prompt": ""
 }

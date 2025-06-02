@@ -1,16 +1,34 @@
-
 import type { Listing } from '../types';
-// import { appConfig } from '../config'; // No longer needed for DB details
+import { auth } from './firebaseService'; // Import Firebase auth instance
 
-// Base URL for the API.
 const API_BASE_URL = 'https://fl.kelownarealestate.com/api';
+
+const getAuthHeader = async (): Promise<HeadersInit> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (auth.currentUser) {
+    try {
+      const token = await auth.currentUser.getIdToken();
+      headers['Authorization'] = `Bearer ${token}`;
+    } catch (error) {
+      console.error("Error getting ID token:", error);
+      // Handle error appropriately, maybe logout user or show error
+    }
+  }
+  return headers;
+};
 
 export const fetchListing = async (mlsId: string): Promise<Listing> => {
   console.log(`Fetching listing for MLS ID: ${mlsId} from backend API`);
   
-  const response = await fetch(`${API_BASE_URL}/listings/${mlsId}`);
+  const headers = await getAuthHeader();
+  const response = await fetch(`${API_BASE_URL}/listings/${mlsId}`, { headers });
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+       throw new Error(`Authentication error (${response.status}). Please log in again.`);
+    }
     if (response.status === 404) {
       throw new Error(`Listing with MLS ID ${mlsId} not found.`);
     }
@@ -20,12 +38,6 @@ export const fetchListing = async (mlsId: string): Promise<Listing> => {
 
   const listingData: Listing = await response.json();
   
-  // Add any necessary data transformation here if backend response differs from frontend type
-  // For example, if PhotoGallery comes as an array and needs to be a string:
-  // if (Array.isArray(listingData.PhotoGallery)) {
-  //   listingData.PhotoGallery = (listingData.PhotoGallery as string[]).join(' ');
-  // }
-
   console.log(`[API DATA] Found listing for MLS ID: ${mlsId}`, listingData);
   return listingData;
 };

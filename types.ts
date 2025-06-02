@@ -1,4 +1,5 @@
 
+
 export interface Listing {
   ListingId: string; // MLS
   ListingKey: string;
@@ -11,6 +12,9 @@ export interface Listing {
   OfficeName: string;
   Latitude: number;
   Longitude: number;
+  BedroomsTotal?: number; // New field
+  BathroomsTotalInteger?: number; // New field
+  BathroomsPartial?: number; // New field
 }
 
 export interface Agent {
@@ -43,6 +47,7 @@ export interface ImageEditState {
   zoom: number;
   croppedAreaPixels: Area | null;
   sharpness?: number; // Added for sharpening, 0-20
+  autoAdjusted?: boolean; // New: True if automatically adjusted
 }
 
 export interface GeneratePackageParams {
@@ -60,6 +65,8 @@ export interface GeneratePackageParams {
 export interface ImageAnalysisResult {
   hasSignificantStrips?: boolean; // This flag indicates if aspect ratio is problematic for 1:1
   isPotentiallyLowResolution?: boolean; // This flag indicates if image resolution is low for target
+  naturalWidth?: number; // New: Original width of the image
+  naturalHeight?: number; // New: Original height of the image
 }
 
 export interface ProcessedPackageResult {

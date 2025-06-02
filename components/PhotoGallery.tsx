@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import type { ImageEditState, ImageAnalysisResult } from '../types';
 import { PhotoIcon } from './icons/PhotoIcon';
@@ -12,7 +13,8 @@ interface PhotoGalleryProps {
   imageEditStates: { [url: string]: ImageEditState };
   initialImageAnalyses?: { [url: string]: ImageAnalysisResult };
   onImageSelect: (url: string) => void;
-  onImageEdit: (url: string) => void;
+  onImageEdit: (url: string) => void; // For manual edit
+  onImageAutoAdjust: (url: string) => void; // For automatic adjustment
   maxSelections: number;
 }
 
@@ -23,6 +25,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   initialImageAnalyses,
   onImageSelect,
   onImageEdit,
+  onImageAutoAdjust,
   maxSelections
 }) => {
   if (photos.length === 0) {
@@ -34,33 +37,59 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       {photos.map((url: string, index: number) => {
         const isSelected = selectedImages.includes(url);
         const isDisabled = !isSelected && selectedImages.length >= maxSelections;
-        const hasBeenEdited = imageEditStates[url]?.croppedAreaPixels !== null && imageEditStates[url]?.croppedAreaPixels !== undefined;
         const selectionOrder = isSelected ? selectedImages.indexOf(url) + 1 : 0;
         
         const analysis = initialImageAnalyses?.[url];
-        const showShapeWarning = analysis?.hasSignificantStrips && !hasBeenEdited;
-        const showLowResolutionWarning = analysis?.isPotentiallyLowResolution && !hasBeenEdited;
+        const editState = imageEditStates[url];
 
+        // Note: hasSignificantStrips and isPotentiallyLowResolution in initialImageAnalyses are cleared 
+        // by handleSaveImageCrop in App.tsx after an edit or auto-adjust.
+        const showShapeWarning = analysis?.hasSignificantStrips === true && !editState?.croppedAreaPixels;
+        const showLowResolutionWarning = analysis?.isPotentiallyLowResolution === true && !editState?.croppedAreaPixels;
+        
         let warningText = "";
         let warningTitle = "";
 
         if (showShapeWarning && showLowResolutionWarning) {
             warningText = "Shape & Low Res?";
-            warningTitle = "Image dimensions are not square and its original resolution is low. Review shape, strips, and potential quality loss for 1:1 format. Use 'Edit Image'.";
+            warningTitle = "Image dimensions are not square and its original resolution is low. Review shape, strips, and potential quality loss for 1:1 format. Use 'Edit Image' (will auto-adjust shape).";
         } else if (showShapeWarning) {
             warningText = "Adjust Shape";
-            warningTitle = "This image's dimensions are not square. It might include added borders (like white strips from the source) or require significant cropping for a 1:1 post. Use 'Edit Image' to select the best 1:1 content.";
+            warningTitle = "This image's dimensions are not square. It might include added borders or require significant cropping for a 1:1 post. Use 'Edit Image' to select the best 1:1 content (will auto-adjust shape).";
         } else if (showLowResolutionWarning) {
             warningText = "Low Res?";
-            warningTitle = "This image's original dimensions are small. Upscaling to 1080x1080 may reduce quality. Consider using a higher resolution photo or use 'Edit Image' to assess the crop.";
+            warningTitle = "This image's original dimensions are small. Upscaling to 1080x1080 may reduce quality. Use 'Edit Image' to assess (manual edit).";
+        }
+        
+        const hasBeenEditedOrAdjusted = editState?.croppedAreaPixels !== null && editState?.croppedAreaPixels !== undefined;
+        const wasAutoAdjusted = editState?.autoAdjusted === true;
+
+        let tagTextToShow = "";
+        let tagColorClass = "";
+        let tagTitleAttribute = "";
+
+        if (wasAutoAdjusted) {
+            tagTextToShow = "Auto-Adjusted";
+            tagColorClass = "bg-green-500 text-white";
+            tagTitleAttribute = "Image automatically adjusted for optimal 1:1 display.";
+        } else if (hasBeenEditedOrAdjusted) { // Manually edited
+            tagTextToShow = "Edited";
+            tagColorClass = "bg-green-500 text-white";
+            tagTitleAttribute = "Custom crop applied.";
+        } else if (warningText) { // Not edited, but has warning
+            tagTextToShow = warningText;
+            tagColorClass = "bg-yellow-400 text-yellow-800";
+            tagTitleAttribute = warningTitle;
         }
         
         const ariaLabelDetails = [
           `Select image ${index + 1}`,
           isSelected ? `, selected as number ${selectionOrder}` : '',
-          warningTitle ? `, warning: ${warningTitle.toLowerCase()}` : ''
+          tagTextToShow ? `, status: ${tagTextToShow}` : '',
+          tagTitleAttribute ? `, details: ${tagTitleAttribute.toLowerCase()}` : ''
         ].join('');
-
+        
+        const editButtonAriaLabel = `Edit image ${index + 1}${showShapeWarning ? ' (will attempt auto-adjustment for shape)' : (showLowResolutionWarning ? ' (manual edit for low resolution)' : '')}`;
 
         return (
           <div
@@ -99,22 +128,27 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
               )}
                {isSelected && (
                  <button
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onImageEdit(url); }}
+                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => { 
+                        e.stopPropagation(); 
+                        if (showShapeWarning) { // Auto-adjust only if shape warning is present
+                            onImageAutoAdjust(url);
+                        } else { // Otherwise, (e.g. only low-res warning, or no warning) open manual editor
+                            onImageEdit(url);
+                        }
+                    }}
                     className="absolute bottom-2 right-2 p-2 bg-white text-slate-700 rounded-full shadow-md hover:bg-slate-100 transition-colors"
-                    aria-label={`Edit image ${index + 1}`}
+                    aria-label={editButtonAriaLabel}
                   >
                     <PencilSquareIcon className="w-5 h-5" />
                   </button>
                )}
-                {isSelected && (hasBeenEdited || warningText) && (
+                {isSelected && tagTextToShow && (
                   <div 
-                    className={`absolute bottom-2 left-2 p-1 text-xs px-2 rounded-full flex items-center
-                                ${hasBeenEdited && !warningText ? 'bg-green-500 text-white' : ''}
-                                ${warningText ? 'bg-yellow-400 text-yellow-800' : ''}`}
-                    title={hasBeenEdited && !warningText ? "Custom crop applied." : warningTitle}
+                    className={`absolute bottom-2 left-2 p-1 text-xs px-2 rounded-full flex items-center ${tagColorClass}`}
+                    title={tagTitleAttribute}
                   >
-                    {(showShapeWarning || showLowResolutionWarning) && !hasBeenEdited && <ExclamationTriangleIcon className="w-3 h-3 mr-1" />}
-                    {hasBeenEdited && !warningText ? "Edited" : warningText}
+                    {(!hasBeenEditedOrAdjusted && (showShapeWarning || showLowResolutionWarning)) && <ExclamationTriangleIcon className="w-3 h-3 mr-1" />}
+                    {tagTextToShow}
                   </div>
                 )}
             </div>

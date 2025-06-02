@@ -1,7 +1,7 @@
-
 import React from 'react';
-import ReactDOM from 'react-dom/client'; // Ensure this path matches your importmap for react-dom/client
+import ReactDOM from 'react-dom/client';
 import App from './App';
+import { AuthProvider } from './contexts/AuthContext'; // Import AuthProvider
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -11,6 +11,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <AuthProvider> {/* Wrap App with AuthProvider */}
+      <App />
+    </AuthProvider>
   </React.StrictMode>
 );

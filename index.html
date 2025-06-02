@@ -49,13 +49,40 @@
   <script>
     UPLOADCARE_PUBLIC_KEY = 'demopublickey';
     UPLOADCARE_IMAGES_ONLY = true; // Optional: ensures widget focuses on images
-    // UPLOADCARE_MANUAL_START = true; // If we wanted to prevent UI widget auto-init
   </script>
 
   <!-- Jimp Library -->
   <script src="https://cdn.jsdelivr.net/npm/jimp@0.22.10/browser/lib/jimp.min.js"></script>
 
-  <!-- Import Map with consistent React 19.1.0 -->
+  <!-- Firebase SDK -->
+  <script type="module">
+    // Firebase App (the core) is always required and must be listed first
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    // Add the Firebase products that you want to use
+    import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyA_-iH9xiJWuFtBc7K2hhuxemJEHEqSH_M",
+      authDomain: "featured-listing-maker.firebaseapp.com",
+      projectId: "featured-listing-maker",
+      storageBucket: "featured-listing-maker.firebasestorage.app",
+      messagingSenderId: "788360845558",
+      appId: "1:788360845558:web:34f1f3a212141ea137b4d7",
+      measurementId: "G-F1SNFL7LDE"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // Make auth available to your application if needed globally,
+    // or preferably import it in your firebaseService.ts
+    window.firebaseApp = app;
+    window.firebaseAuth = auth;
+  </script>
+
+  <!-- Import Map -->
   <script type="importmap">
 {
   "imports": {
@@ -74,16 +101,22 @@
     "process": "https://esm.sh/process@0.11.10",
     "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
     "react/": "https://esm.sh/react@^19.1.0/",
-    "fs": "https://esm.sh/fs@^0.0.1-security"
+    "fs": "https://esm.sh/fs@^0.0.1-security",
+    "@google/genai": "https://esm.sh/@google/genai",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js",
+    "firebase/": "https://esm.sh/firebase@^11.8.1/",
+    "firebase-admin": "https://esm.sh/firebase-admin@^13.4.0"
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-slate-100">
   <div id="root"></div>
 
   <!-- Your main frontend app -->
   <script type="module" src="/dist_frontend/index.js"></script>
+<script type="module" src="/index.tsx"></script>
 </body>
-</html><link rel="stylesheet" href="index.css">
-<script src="index.tsx" type="module"></script>
+</html>

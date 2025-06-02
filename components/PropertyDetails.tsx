@@ -6,12 +6,48 @@ interface PropertyDetailsProps {
   listing: Listing;
 }
 
+// Helper to format bed/bath display for PropertyDetails component
+const getBedBathDisplayForDetails = (listing: Listing): string | null => {
+  let bedsStr = "";
+  if (listing.BedroomsTotal && listing.BedroomsTotal > 0) {
+    bedsStr = `${listing.BedroomsTotal} Bed${listing.BedroomsTotal > 1 ? 's' : ''}`;
+  }
+
+  let totalBaths = 0;
+  if (listing.BathroomsTotalInteger && listing.BathroomsTotalInteger > 0) {
+    totalBaths += listing.BathroomsTotalInteger;
+  }
+  if (listing.BathroomsPartial && listing.BathroomsPartial > 0) {
+    totalBaths += listing.BathroomsPartial; // Simple sum as per previous logic
+  }
+  
+  let bathsStr = "";
+  if (totalBaths > 0) {
+    // Could be refined to show "2.5 Baths" if partial was treated as 0.5,
+    // but current AI logic sums them as whole numbers for "X Baths".
+    // For consistency in PropertyDetails, we'll do the same.
+    bathsStr = `${totalBaths} Bath${totalBaths > 1 ? 's' : ''}`;
+  }
+
+  if (bedsStr && bathsStr) {
+    return `${bedsStr}  •  ${bathsStr}`;
+  } else if (bedsStr) {
+    return bedsStr;
+  } else if (bathsStr) {
+    return bathsStr;
+  }
+  return null; // No bed/bath info to display
+};
+
+
 export const PropertyDetails: React.FC<PropertyDetailsProps> = ({ listing }) => {
+  const bedBathInfo = getBedBathDisplayForDetails(listing);
+
   return (
     <div className="space-y-4 text-slate-700">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
         <div>
-          <p className="font-semibold">MLS ID:</p>
+          <p className="font-semibold">MLS® Number:</p>
           <p>{listing.ListingId}</p>
         </div>
         <div>
@@ -30,6 +66,12 @@ export const PropertyDetails: React.FC<PropertyDetailsProps> = ({ listing }) => 
           <p className="font-semibold">Office:</p>
           <p>{listing.OfficeName}</p>
         </div>
+        {bedBathInfo && (
+          <div className="md:col-span-2"> {/* Span across columns or place appropriately */}
+            <p className="font-semibold">Features:</p>
+            <p>{bedBathInfo}</p>
+          </div>
+        )}
       </div>
       <div>
         <p className="font-semibold">Description:</p>

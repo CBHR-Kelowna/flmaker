@@ -1,4 +1,5 @@
 
+
 import type { Area, GeneratePackageParams, ImageEditState, ProcessedPackageResult, ImageAnalysisResult } from '../types';
 
 // Declare Uploadcare and Jimp global variables for TypeScript
@@ -39,7 +40,12 @@ export const analyzeImageDimensionsAndStrips = async (originalUrl: string): Prom
     return new Promise(async (resolve) => {
         let urlToLoad = originalUrl;
         let wasProxiedByUploadcare = false;
-        const analysisResult: ImageAnalysisResult = { hasSignificantStrips: undefined, isPotentiallyLowResolution: undefined };
+        const analysisResult: ImageAnalysisResult = { 
+            hasSignificantStrips: undefined, 
+            isPotentiallyLowResolution: undefined,
+            naturalWidth: undefined,
+            naturalHeight: undefined,
+        };
 
         const needsProxyDueToCDN = PROBLEMATIC_CDN_HOSTS.some(host => originalUrl.includes(host));
         let currentUuid = getUploadcareUuid(originalUrl);
@@ -73,6 +79,8 @@ export const analyzeImageDimensionsAndStrips = async (originalUrl: string): Prom
                 console.warn("[Analysis] Jimp is not available. Cannot perform strip or low-resolution detection. Flagging cautiously for strips.");
                 analysisResult.hasSignificantStrips = true;
                 analysisResult.isPotentiallyLowResolution = undefined;
+                analysisResult.naturalWidth = imgHtmlElement.naturalWidth; // Store from HTMLImageElement if Jimp fails early
+                analysisResult.naturalHeight = imgHtmlElement.naturalHeight;
                 resolve(analysisResult); 
                 return;
             }
@@ -82,6 +90,9 @@ export const analyzeImageDimensionsAndStrips = async (originalUrl: string): Prom
                 const jimpImage = await Jimp.read(urlToLoad);
                 const width = jimpImage.getWidth();
                 const height = jimpImage.getHeight();
+
+                analysisResult.naturalWidth = width;
+                analysisResult.naturalHeight = height;
 
                 if (width === 0 || height === 0) {
                     console.warn(`[Analysis] Jimp loaded image ${urlToLoad} with zero dimensions.`);
@@ -160,6 +171,9 @@ export const analyzeImageDimensionsAndStrips = async (originalUrl: string): Prom
                 console.error(`[Analysis] Jimp processing failed for ${urlToLoad} (original: ${originalUrl}). Flagging cautiously. Error:`, jimpError);
                 analysisResult.hasSignificantStrips = true; 
                 analysisResult.isPotentiallyLowResolution = true; // Also flag as potentially low res if Jimp fails
+                // Try to get dimensions from HTMLImageElement as fallback if Jimp failed after load
+                analysisResult.naturalWidth = analysisResult.naturalWidth || imgHtmlElement.naturalWidth;
+                analysisResult.naturalHeight = analysisResult.naturalHeight || imgHtmlElement.naturalHeight;
                 resolve(analysisResult); 
             }
         };
@@ -171,6 +185,7 @@ export const analyzeImageDimensionsAndStrips = async (originalUrl: string): Prom
             console.error(errorMessage, _event);
             if (analysisResult.hasSignificantStrips === undefined) analysisResult.hasSignificantStrips = true;
             if (analysisResult.isPotentiallyLowResolution === undefined) analysisResult.isPotentiallyLowResolution = true; // Flag as potentially low res
+            // naturalWidth/Height will remain undefined if image load fails
             resolve(analysisResult); 
         };
         console.log(`[Analysis] Attempting to load image for analysis from: ${urlToLoad} (HTMLImageElement src set for onload/onerror)`);

@@ -1,5 +1,12 @@
 
-import express, { Express, Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
+import express, {
+    Express,
+    Request as ExpressRequest, // Aliased
+    Response as ExpressResponse, // Aliased
+    NextFunction as ExpressNextFunction, // Aliased
+    RequestHandler,
+    ErrorRequestHandler
+} from 'express';
 import { MongoClient, Db, Collection } from 'mongodb';
 import cors, { CorsOptions } from 'cors';
 import path from 'path';
@@ -7,16 +14,45 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import * as admin from 'firebase-admin'; // Import Firebase Admin SDK
 
+// --- Environment Variable Loading and Diagnostics ---
+const envPathUsed = path.resolve(process.cwd(), '.env');
+console.log(`Attempting to load environment variables from: ${envPathUsed}`);
+const dotenvResult = dotenv.config({ path: envPathUsed });
+
+if (dotenvResult.error) {
+  console.error(`Error loading .env file from ${envPathUsed}: ${dotenvResult.error.message}`);
+} else if (dotenvResult.parsed) {
+  console.log(`Successfully loaded and parsed .env file from ${envPathUsed}`);
+  if (dotenvResult.parsed.GOOGLE_APPLICATION_CREDENTIALS) {
+    console.log(`dotenv: GOOGLE_APPLICATION_CREDENTIALS found in .env file content: '${dotenvResult.parsed.GOOGLE_APPLICATION_CREDENTIALS}'`);
+  } else {
+    console.warn(`dotenv: GOOGLE_APPLICATION_CREDENTIALS was NOT found in the parsed .env file content.`);
+  }
+} else {
+  console.warn(`No .env file found at ${envPathUsed}, or it is empty. Attempting to rely on globally set environment variables.`);
+}
+
+// Check process.env immediately after dotenv attempt
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    console.log(`process.env: GOOGLE_APPLICATION_CREDENTIALS is set to: '${process.env.GOOGLE_APPLICATION_CREDENTIALS}'`);
+} else {
+    console.warn(`process.env: GOOGLE_APPLICATION_CREDENTIALS is UNDEFINED after dotenv.config() call.`);
+}
+// --- End Environment Variable Loading and Diagnostics ---
+
+
 // --- Firebase Admin SDK Initialization ---
 const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 if (!serviceAccountPath) {
-    console.error("FATAL ERROR: GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.");
+    console.error("FATAL ERROR: GOOGLE_APPLICATION_CREDENTIALS environment variable is not set in process.env at the time of Firebase Admin SDK initialization.");
     console.error("This variable should point to your Firebase service account key JSON file.");
+    console.error("Ensure it's correctly set in your .env file and that PM2 is loading it (e.g., via ecosystem.config.js or by restarting PM2 with --update-env).");
     process.exit(1);
 }
 
 try {
+    console.log(`Firebase Admin SDK: Attempting to use service account key from path: ${serviceAccountPath}`);
     if (!fs.existsSync(serviceAccountPath)) {
         console.error(`FATAL ERROR: Service account key file not found at path: ${serviceAccountPath}`);
         console.error("Ensure GOOGLE_APPLICATION_CREDENTIALS points to a valid and readable JSON key file.");
@@ -39,19 +75,8 @@ try {
 }
 // --- End Firebase Admin SDK Initialization ---
 
-const dotenvResult = dotenv.config({ path: path.resolve(process.cwd(), '.env') }); // Uses global process
-const envPathUsed = path.resolve(process.cwd(), '.env'); // Uses global process
-
-if (dotenvResult.error) {
-  console.error(`Error loading .env file from ${envPathUsed}: ${dotenvResult.error.message}`);
-} else if (dotenvResult.parsed) {
-  console.log(`Successfully loaded environment variables from ${envPathUsed}`);
-} else {
-  console.warn(`No .env file found at ${envPathUsed}, or it is empty. Relying on globally set environment variables.`);
-}
-
 // Extend Express Request type to include user
-interface AuthenticatedRequest extends Request {
+interface AuthenticatedRequest extends ExpressRequest { // Use aliased ExpressRequest
   user?: admin.auth.DecodedIdToken;
 }
 
@@ -68,7 +93,7 @@ const allowedOrigins = [
   'http://15.223.66.150',
   'http://15.223.66.150:3001',
   'https://fl.kelownarealestate.com',
-  'https://0jj6trdhljkycwzkbo2urievkgo0o8jmzhllh1vqi8gh9d1cii-h763805538.scf.usercontent.goog' // Added new origin
+  'https://0jj6trdhljkycwzkbo2urievkgo0o8jmzhllh1vqi8gh9d1cii-h763805538.scf.usercontent.goog'
 ];
 
 const corsOptions: CorsOptions = {
@@ -98,15 +123,19 @@ const listingsCollectionName = process.env.MONGODB_LISTINGS_COLLECTION || 'Listi
 const agentsCollectionName = process.env.MONGODB_AGENTS_COLLECTION || 'Agents';
 const teamsCollectionName = process.env.MONGODB_TEAMS_COLLECTION || 'Teams';
 
-if (!mongoUri || !dbName) {
-  console.error('FATAL ERROR: MONGODB_URI or MONGODB_DB_NAME is not defined.');
-  process.exit(1); // Uses global process
+if (!mongoUri) {
+  console.error('FATAL ERROR: MONGODB_URI is not defined. Check .env file and PM2 configuration.');
+  process.exit(1);
+}
+if (!dbName) {
+  console.error('FATAL ERROR: MONGODB_DB_NAME is not defined. Check .env file and PM2 configuration.');
+  process.exit(1);
 }
 
 const client = new MongoClient(mongoUri!);
 
 // Firebase Authentication Middleware
-const authenticateToken: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+const authenticateToken: RequestHandler = async (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => {
   const authReq = req as AuthenticatedRequest;
   const authHeader = authReq.headers.authorization;
 
@@ -128,8 +157,7 @@ const authenticateToken: RequestHandler = async (req: Request, res: Response, ne
     console.log(`Auth middleware: Token verified for UID ${decodedToken.uid}`);
     next();
   } catch (error: any) {
-    console.error('Auth middleware: Invalid token.', error.message); // Keep detailed error logging
-    // Send a generic message to the client for security
+    console.error('Auth middleware: Invalid token.', error.message);
     return res.status(403).json({ message: 'Invalid or expired authentication token.' });
   }
 };
@@ -139,7 +167,7 @@ async function connectAndStartServer() {
   try {
     await client.connect();
     console.log('Successfully connected to MongoDB Atlas.');
-    db = client.db(dbName);
+    db = client.db(dbName!);
     console.log(`Using database: "${dbName}"`);
 
     listingsCollection = db.collection(listingsCollectionName);
@@ -147,11 +175,10 @@ async function connectAndStartServer() {
     teamsCollection = db.collection(teamsCollectionName);
     console.log(`Ensured collections: Listings='${listingsCollectionName}', Agents='${agentsCollectionName}', Teams='${teamsCollectionName}'`);
 
-    // Apply authentication middleware to all /api routes
     app.use('/api', authenticateToken);
 
 
-    app.get('/api/listings/:mlsId', async (req: Request, res: Response) => {
+    app.get('/api/listings/:mlsId', async (req: ExpressRequest, res: ExpressResponse) => {
       const authReq = req as AuthenticatedRequest;
       const { mlsId } = authReq.params;
       console.log(`User ${authReq.user?.uid} requesting listing ${mlsId}`);
@@ -171,7 +198,7 @@ async function connectAndStartServer() {
       }
     });
 
-    app.get('/api/agents', async (req: Request, res: Response) => {
+    app.get('/api/agents', async (req: ExpressRequest, res: ExpressResponse) => {
         const authReq = req as AuthenticatedRequest;
         console.log(`User ${authReq.user?.uid} requesting agents`);
       if (!agentsCollection) {
@@ -190,7 +217,7 @@ async function connectAndStartServer() {
       }
     });
 
-    app.get('/api/teams', async (req: Request, res: Response) => {
+    app.get('/api/teams', async (req: ExpressRequest, res: ExpressResponse) => {
         const authReq = req as AuthenticatedRequest;
         console.log(`User ${authReq.user?.uid} requesting teams`);
       if (!teamsCollection) {
@@ -209,10 +236,10 @@ async function connectAndStartServer() {
       }
     });
 
-    const distFrontendPath = path.join(process.cwd(), 'dist_frontend'); // Uses global process
+    const distFrontendPath = path.join(process.cwd(), 'dist_frontend');
     app.use('/dist_frontend', express.static(distFrontendPath, {
         extensions: ['js'],
-        setHeaders: (res: Response, filePath: string) => { 
+        setHeaders: (res: ExpressResponse, filePath: string) => {
           if (filePath.endsWith('.js')) {
             res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
           }
@@ -227,8 +254,8 @@ async function connectAndStartServer() {
       console.log(`Frontend entry point found: ${mainScriptPath}`);
     }
 
-    const indexPath = path.join(process.cwd(), 'index.html'); // Uses global process
-    app.get('*', (req: Request, res: Response, next: NextFunction) => {
+    const indexPath = path.join(process.cwd(), 'index.html');
+    app.get('*', (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => {
       if (req.path.startsWith('/api/')) {
         return next();
       }
@@ -242,14 +269,16 @@ async function connectAndStartServer() {
       });
     });
 
-    app.use('/api/*', (req: Request, res: Response) => {
+    app.use('/api/*', (req: ExpressRequest, res: ExpressResponse) => {
       res.status(404).json({ message: `API endpoint not found: ${req.method} ${req.originalUrl}` });
     });
 
-    const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
-      console.error("Unhandled error:", err.stack);
+    const errorHandler: ErrorRequestHandler = (err: any, req: ExpressRequest, res: ExpressResponse, _next: ExpressNextFunction) => {
+      console.error("Unhandled error:", err.stack || err);
       if (res.headersSent) {
-        return _next(err); // Delegate to default Express error handler if headers already sent
+        // If headers are already sent, delegate to the default Express error handler.
+        // It's important to pass all four arguments to _next for it to be recognized as an error handler.
+        return _next(err);
       }
       if (err.message && err.message.includes('Not allowed by CORS')) {
           res.status(403).json({ message: err.message });
@@ -266,7 +295,7 @@ async function connectAndStartServer() {
 
   } catch (err) {
     console.error(`Failed to connect to MongoDB, initialize collections, or start server.`, err);
-    process.exit(1); // Uses global process
+    process.exit(1);
   }
 }
 

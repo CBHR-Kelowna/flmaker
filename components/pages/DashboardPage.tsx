@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import type { UserProfile, Listing } from '../../types';
-import type { User } from 'firebase/auth'; // Ensured User type import
+import type { User as FirebaseUser } from 'firebase/auth'; // Ensured User type import, aliased for consistency
 import { fetchAgentListings } from '../../services/userService';
 import { Button } from '../Button';
 import { LoadingIcon } from '../icons/LoadingIcon';
@@ -9,7 +9,7 @@ import { ExclamationTriangleIcon } from '../icons/ExclamationTriangleIcon';
 import { PhotoIcon } from '../icons/PhotoIcon'; // Placeholder for listing card image
 
 interface DashboardPageProps {
-  currentUser: User;
+  currentUser: FirebaseUser; // Use aliased type
   userProfile: UserProfile | null;
   navigate: (path: string) => void;
 }

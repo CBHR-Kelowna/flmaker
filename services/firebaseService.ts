@@ -1,8 +1,9 @@
 
-import { initializeApp } from 'firebase/app';
+import * as firebaseAppNs from 'firebase/app';
 import type { FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import * as firebaseAuthNs from 'firebase/auth';
 import type { Auth } from 'firebase/auth';
+
 
 // IMPORTANT: Replace these with your actual Firebase project configuration values
 // These values are typically found in your Firebase project settings.
@@ -17,9 +18,9 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app: FirebaseApp = initializeApp(firebaseConfig);
+const app: FirebaseApp = firebaseAppNs.initializeApp(firebaseConfig);
 
 // Initialize Firebase Authentication and get a reference to the service
-const auth: Auth = getAuth(app);
+const auth: Auth = firebaseAuthNs.getAuth(app);
 
 export { app, auth };

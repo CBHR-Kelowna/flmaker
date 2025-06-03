@@ -3,7 +3,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import type { UserProfile } from './types';
-import type { User } from 'firebase/auth'; // Ensured User type import
+// Assuming User type would be resolved via firebaseAuth.User if direct import fails,
+// but will keep direct type import for now as per strategy.
+// If 'User' is not found, this will still be an error, namespacing mostly helps values.
+import type { User as FirebaseUser } from 'firebase/auth'; // Ensured User type import
 import { fetchUserProfile } from './services/userService';
 
 import { AuthPage } from './components/auth/AuthPage';
@@ -119,14 +122,14 @@ const App: React.FC = () => {
 
   switch (baseRoute) {
     case '#/create':
-      pageContent = <CreateListingPage currentUser={currentUser as User} userProfile={userProfile} mlsIdFromUrl={param} />;
+      pageContent = <CreateListingPage currentUser={currentUser as FirebaseUser} userProfile={userProfile} mlsIdFromUrl={param} />;
       break;
     case '#/profile':
       pageContent = <ProfilePage userProfile={userProfile} onProfileUpdate={setUserProfile} />;
       break;
     case '#/dashboard':
     default:
-      pageContent = <DashboardPage currentUser={currentUser as User} userProfile={userProfile} navigate={navigate} />;
+      pageContent = <DashboardPage currentUser={currentUser as FirebaseUser} userProfile={userProfile} navigate={navigate} />;
       break;
   }
 

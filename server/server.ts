@@ -1,6 +1,7 @@
 
-import express, { Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
-import { Collection, Db, MongoClient, FindOptions } from 'mongodb'; // Added FindOptions
+import express from 'express';
+import type { Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
+import { Collection, Db, MongoClient, FindOptions, ObjectId } from 'mongodb'; // Added ObjectId and FindOptions
 import cors, { CorsOptions } from 'cors';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -27,18 +28,22 @@ if (dotenvResult.error) {
 // --- End Environment Variable Loading ---
 
 // --- Firebase Admin SDK Initialization ---
-const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+const serviceAccountPathFromEnv = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
-if (!serviceAccountPath) {
+if (!serviceAccountPathFromEnv) {
     console.error("FATAL ERROR: GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.");
     (process as NodeJS.Process).exit(1);
 }
+
+// Explicitly ensure serviceAccountPath is a string before using with fs
+const serviceAccountPath: string = serviceAccountPathFromEnv;
+
 try {
-    if (!fs.existsSync(serviceAccountPath)) {
+    if (!fs.existsSync(serviceAccountPath)) { // Now serviceAccountPath is definitely a string
         console.error(`FATAL ERROR: Service account key file not found at path: ${serviceAccountPath}`);
         (process as NodeJS.Process).exit(1);
     }
-    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8')); // serviceAccountPath is a string
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount)
     });
@@ -64,7 +69,7 @@ interface AuthenticatedRequest extends Request {
   user?: admin.auth.DecodedIdToken;
 }
 
-const app = express(); // No need to type app: express.Express, express() infers it
+const app = express(); 
 const port = process.env.PORT || 3001;
 
 const allowedOrigins = [
@@ -189,20 +194,23 @@ async function connectAndStartServer() {
             return res.status(403).json({ message: 'User UID not found in token.' });
         }
         try {
-            let userProfile = await userProfilesCollection.findOne({ firebaseUID });
-            if (!userProfile) {
+            let userProfileDoc = await userProfilesCollection.findOne({ firebaseUID });
+            if (!userProfileDoc) {
                 // Create a default profile if none exists
-                const newUserProfile: UserProfile = {
+                const newUserProfileData: UserProfile = {
                     firebaseUID,
                     agentKey: null,
                     email: authReq.user?.email || '',
                     displayName: authReq.user?.name || authReq.user?.displayName || null,
                 };
-                await userProfilesCollection.insertOne(newUserProfile);
-                userProfile = newUserProfile;
+                const insertResult = await userProfilesCollection.insertOne(newUserProfileData);
+                userProfileDoc = { // Construct the document as if it were found, including the new _id
+                    ...newUserProfileData,
+                    _id: insertResult.insertedId,
+                } as UserProfile & {_id: ObjectId}; // Ensure _id type for consistency
             }
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { _id, ...profileData } = userProfile as any; // Exclude MongoDB _id
+            const { _id, ...profileData } = userProfileDoc as any; // Exclude MongoDB _id from response
             res.json(profileData);
         } catch (error) {
             console.error('Error fetching/creating user profile:', error);
@@ -233,13 +241,13 @@ async function connectAndStartServer() {
                 { $set: updateData },
                 { upsert: true, returnDocument: 'after' }
             );
-            if (result) {
+            if (result) { 
                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const { _id, ...profileData } = result as any; // Exclude MongoDB _id
+                const { _id, ...profileData } = result as any; 
                 res.json(profileData);
             } else {
-                // Should not happen with upsert: true and returnDocument: 'after'
-                res.status(500).json({ message: 'Failed to update or create user profile.' });
+                console.error('User profile update/creation failed to return a document, which is unexpected.');
+                res.status(500).json({ message: 'Failed to update or create user profile (unexpected result).' });
             }
         } catch (error) {
             console.error('Error updating user profile:', error);
@@ -267,14 +275,12 @@ async function connectAndStartServer() {
                     { CoListAgentKey: agentKey }
                 ]
             };
-             // Optional: Add sorting, e.g., by date or price. For now, no specific sort.
             const options: FindOptions = {
                 projection: { PhotoGallery: 1, UnparsedAddress: 1, StreetName: 1, City: 1, ListPrice: 1, ListingId: 1, BedroomsTotal:1, BathroomsTotalInteger:1, BathroomsPartial:1  },
-                limit: 50 // Prevent accidentally fetching too many, adjust as needed
+                limit: 50 
             };
             const listings = await listingsCollection.find(query, options).toArray();
 
-            // Map to remove _id and ensure Listing structure
             const mappedListings = listings.map(listingDoc => {
               // eslint-disable-next-line @typescript-eslint/no-unused-vars
               const { _id, ...listingData } = listingDoc;
@@ -417,7 +423,7 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
     const distFrontendPath = path.join((process as NodeJS.Process).cwd(), 'dist_frontend');
     app.use('/dist_frontend', express.static(distFrontendPath, {
         extensions: ['js'],
-        setHeaders: (res: NodeServerResponse, filePath: string) => { // Used NodeServerResponse from http
+        setHeaders: (res: NodeServerResponse, filePath: string) => { 
           if (filePath.endsWith('.js')) {
             res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
           }
@@ -430,10 +436,10 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
       if (req.path.startsWith('/api/')) {
         return next();
       }
-      res.sendFile(indexPath, (err: NodeJS.ErrnoException | null) => { // Explicitly type err
+      res.sendFile(indexPath, (err: NodeJS.ErrnoException | null) => { 
         if (err) {
           if (!res.headersSent) {
-            const status = (err as any).status || 500; // Common pattern for error status
+            const status = (err as any).status || 500; 
             res.status(status).send('Error serving application.');
           }
         }

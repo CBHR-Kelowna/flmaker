@@ -11,7 +11,7 @@ import type { Listing, UserProfile } from '../types'; // Import UserProfile
 import type { ServerResponse as NodeServerResponse } from 'http'; // For express.static setHeaders
 
 // --- Environment Variable Loading and Diagnostics ---
-const envPathUsed = path.resolve((process as NodeJS.Process).cwd(), '.env');
+const envPathUsed = path.resolve(process.cwd(), '.env');
 console.log(`Attempting to load environment variables from: ${envPathUsed}`);
 const dotenvResult = dotenv.config({ path: envPathUsed });
 
@@ -31,22 +31,26 @@ const serviceAccountPathFromEnv = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 if (!serviceAccountPathFromEnv) {
     console.error("FATAL ERROR: GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.");
-    (process as NodeJS.Process).exit(1);
+    process.exit(1); 
 }
 
+// Assign to a new constant after the check to ensure TypeScript infers it as string.
+const definiteServiceAccountPath: string = serviceAccountPathFromEnv;
+
 try {
-    if (!fs.existsSync(serviceAccountPathFromEnv)) { 
-        console.error(`FATAL ERROR: Service account key file not found at path: ${serviceAccountPathFromEnv}`);
-        (process as NodeJS.Process).exit(1);
+    if (!fs.existsSync(definiteServiceAccountPath)) { 
+        console.error(`FATAL ERROR: Service account key file not found at path: ${definiteServiceAccountPath}`);
+        process.exit(1); 
     }
-    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPathFromEnv, 'utf8')); 
+    const serviceAccountFileContent = fs.readFileSync(definiteServiceAccountPath, 'utf8');
+    const serviceAccount = JSON.parse(serviceAccountFileContent);
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount)
     });
     console.log("Firebase Admin SDK initialized successfully.");
 } catch (error: any) {
-    console.error("Firebase Admin SDK initialization failed:", error.message);
-    (process as NodeJS.Process).exit(1);
+    console.error(`Firebase Admin SDK initialization failed: ${error.message}. Path used: ${definiteServiceAccountPath}`);
+    process.exit(1); 
 }
 // --- End Firebase Admin SDK Initialization ---
 
@@ -54,7 +58,7 @@ try {
 const apiKey = process.env.API_KEY;
 if (!apiKey) {
   console.error('FATAL ERROR: API_KEY for Gemini AI is not defined. Check .env file and PM2 configuration.');
-  (process as NodeJS.Process).exit(1);
+  process.exit(1); 
 }
 const ai = new GoogleGenAI({ apiKey });
 console.log("Google GenAI SDK initialized.");
@@ -112,7 +116,7 @@ const userProfilesCollectionName = process.env.MONGODB_USERPROFILES_COLLECTION |
 
 if (!mongoUri || !dbName) {
   console.error('FATAL ERROR: MONGODB_URI or MONGODB_DB_NAME is not defined.');
-  (process as NodeJS.Process).exit(1);
+  process.exit(1); 
 }
 
 const client = new MongoClient(mongoUri!);
@@ -416,7 +420,7 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
     });
 
 
-    const distFrontendPath = path.join((process as NodeJS.Process).cwd(), 'dist_frontend');
+    const distFrontendPath = path.join(process.cwd(), 'dist_frontend');
     app.use('/dist_frontend', express.static(distFrontendPath, {
         extensions: ['js'],
         setHeaders: (res: NodeServerResponse, filePath: string) => { 
@@ -427,12 +431,12 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
       })
     );
 
-    const indexPath = path.join((process as NodeJS.Process).cwd(), 'index.html');
+    const indexPath = path.join(process.cwd(), 'index.html');
     app.get('*', (req: Request, res: Response, next: NextFunction) => {
       if (req.path.startsWith('/api/')) {
         return next();
       }
-      res.sendFile(indexPath, (err: NodeJS.ErrnoException | null) => { 
+      res.sendFile(indexPath, (err: Error | null) => { 
         if (err) {
           if (!res.headersSent) {
             const status = (err as any).status || 500; 
@@ -466,7 +470,7 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
 
   } catch (err) {
     console.error(`Server startup failed:`, err);
-    (process as NodeJS.Process).exit(1);
+    process.exit(1); 
   }
 }
 

@@ -12,7 +12,9 @@ import cors, { CorsOptions } from 'cors';
 import path from 'path';
 import dotenv from 'dotenv';
 import fs from 'fs';
-import * as admin from 'firebase-admin'; // Import Firebase Admin SDK
+import * as admin from 'firebase-admin';
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai"; // Import Gemini AI
+import type { Listing } from '../types'; // Import shared Listing type
 
 // --- Environment Variable Loading and Diagnostics ---
 const envPathUsed = path.resolve(process.cwd(), '.env');
@@ -28,55 +30,62 @@ if (dotenvResult.error) {
   } else {
     console.warn(`dotenv: GOOGLE_APPLICATION_CREDENTIALS was NOT found in the parsed .env file content.`);
   }
+  if (dotenvResult.parsed.API_KEY) {
+    console.log(`dotenv: API_KEY found in .env file.`);
+  } else {
+    console.warn(`dotenv: API_KEY was NOT found in the parsed .env file content.`);
+  }
 } else {
   console.warn(`No .env file found at ${envPathUsed}, or it is empty. Attempting to rely on globally set environment variables.`);
 }
 
-// Check process.env immediately after dotenv attempt
 if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     console.log(`process.env: GOOGLE_APPLICATION_CREDENTIALS is set to: '${process.env.GOOGLE_APPLICATION_CREDENTIALS}'`);
 } else {
     console.warn(`process.env: GOOGLE_APPLICATION_CREDENTIALS is UNDEFINED after dotenv.config() call.`);
 }
-// --- End Environment Variable Loading and Diagnostics ---
-
+if (process.env.API_KEY) {
+    console.log(`process.env: API_KEY is available.`);
+} else {
+    console.warn(`process.env: API_KEY is UNDEFINED after dotenv.config() call.`);
+}
+// --- End Environment Variable Loading ---
 
 // --- Firebase Admin SDK Initialization ---
 const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 if (!serviceAccountPath) {
-    console.error("FATAL ERROR: GOOGLE_APPLICATION_CREDENTIALS environment variable is not set in process.env at the time of Firebase Admin SDK initialization.");
-    console.error("This variable should point to your Firebase service account key JSON file.");
-    console.error("Ensure it's correctly set in your .env file and that PM2 is loading it (e.g., via ecosystem.config.js or by restarting PM2 with --update-env).");
+    console.error("FATAL ERROR: GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.");
     process.exit(1);
 }
-
 try {
-    console.log(`Firebase Admin SDK: Attempting to use service account key from path: ${serviceAccountPath}`);
     if (!fs.existsSync(serviceAccountPath)) {
         console.error(`FATAL ERROR: Service account key file not found at path: ${serviceAccountPath}`);
-        console.error("Ensure GOOGLE_APPLICATION_CREDENTIALS points to a valid and readable JSON key file.");
         process.exit(1);
     }
     const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount)
     });
-    console.log("Firebase Admin SDK initialized successfully using service account file.");
+    console.log("Firebase Admin SDK initialized successfully.");
 } catch (error: any) {
     console.error("Firebase Admin SDK initialization failed:", error.message);
-    console.error(`Error occurred while trying to use service account key from: ${serviceAccountPath}`);
-    if (error.code === 'ENOENT') {
-        console.error("Specific Error: Service account file not found. Please double-check the path and permissions.");
-    } else if (error instanceof SyntaxError) {
-        console.error("Specific Error: Failed to parse the service account JSON. Ensure the file is a valid JSON.");
-    }
     process.exit(1);
 }
 // --- End Firebase Admin SDK Initialization ---
 
-// Extend Express Request type to include user
-interface AuthenticatedRequest extends ExpressRequest { // Use aliased ExpressRequest
+// --- Gemini AI Initialization ---
+const apiKey = process.env.API_KEY;
+if (!apiKey) {
+  console.error('FATAL ERROR: API_KEY for Gemini AI is not defined. Check .env file and PM2 configuration.');
+  process.exit(1);
+}
+const ai = new GoogleGenAI({ apiKey });
+console.log("Google GenAI SDK initialized.");
+// --- End Gemini AI Initialization ---
+
+
+interface AuthenticatedRequest extends ExpressRequest { 
   user?: admin.auth.DecodedIdToken;
 }
 
@@ -90,7 +99,7 @@ const allowedOrigins = [
   'http://127.0.0.1:5500',
   `http://localhost:${port}`,
   `http://127.0.0.1:${port}`,
-  'http://15.223.66.150',
+  'http://15.223.66.150', // Your EC2 instance IP
   'http://15.223.66.150:3001',
   'https://fl.kelownarealestate.com',
   'https://0jj6trdhljkycwzkbo2urievkgo0o8jmzhllh1vqi8gh9d1cii-h763805538.scf.usercontent.goog'
@@ -110,7 +119,7 @@ const corsOptions: CorsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '5mb' })); // Increase limit if sending large listing data
 
 let db: Db;
 let listingsCollection: Collection;
@@ -123,43 +132,60 @@ const listingsCollectionName = process.env.MONGODB_LISTINGS_COLLECTION || 'Listi
 const agentsCollectionName = process.env.MONGODB_AGENTS_COLLECTION || 'Agents';
 const teamsCollectionName = process.env.MONGODB_TEAMS_COLLECTION || 'Teams';
 
-if (!mongoUri) {
-  console.error('FATAL ERROR: MONGODB_URI is not defined. Check .env file and PM2 configuration.');
-  process.exit(1);
-}
-if (!dbName) {
-  console.error('FATAL ERROR: MONGODB_DB_NAME is not defined. Check .env file and PM2 configuration.');
+if (!mongoUri || !dbName) {
+  console.error('FATAL ERROR: MONGODB_URI or MONGODB_DB_NAME is not defined.');
   process.exit(1);
 }
 
 const client = new MongoClient(mongoUri!);
 
-// Firebase Authentication Middleware
 const authenticateToken: RequestHandler = async (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => {
   const authReq = req as AuthenticatedRequest;
   const authHeader = authReq.headers.authorization;
-
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log('Auth middleware: No or malformed Bearer token provided.');
-    return res.status(401).json({ message: 'Authentication token required or malformed (must be Bearer token).' });
+    return res.status(401).json({ message: 'Authentication token required (Bearer).' });
   }
-
-  const tokenParts = authHeader.split(' ');
-  if (tokenParts.length !== 2 || tokenParts[0] !== 'Bearer' || !tokenParts[1]) {
-    console.log('Auth middleware: Malformed Bearer token structure.');
+  const token = authHeader.split(' ')[1];
+  if (!token) {
     return res.status(401).json({ message: 'Authentication token malformed.' });
   }
-  const token = tokenParts[1];
-
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
-    authReq.user = decodedToken; // Add user to request object
-    console.log(`Auth middleware: Token verified for UID ${decodedToken.uid}`);
+    authReq.user = decodedToken;
     next();
   } catch (error: any) {
     console.error('Auth middleware: Invalid token.', error.message);
     return res.status(403).json({ message: 'Invalid or expired authentication token.' });
   }
+};
+
+// Helper function for AI prompt (similar to client-side one)
+const getBedBathDisplayInfoForServer = (listing: Listing): {
+  bedBathTextFormatted: string | null;
+  bedsForPrompt: string;
+  bathsForPrompt: string;
+} => {
+  let bedsCount = 0;
+  if (listing.BedroomsTotal && listing.BedroomsTotal > 0) {
+    bedsCount = listing.BedroomsTotal;
+  }
+  let totalCalculatedBaths = 0;
+  if (listing.BathroomsTotalInteger && listing.BathroomsTotalInteger > 0) {
+    totalCalculatedBaths += listing.BathroomsTotalInteger;
+  }
+  if (listing.BathroomsPartial && listing.BathroomsPartial > 0) {
+    totalCalculatedBaths += listing.BathroomsPartial;
+  }
+  if (bedsCount === 0 && totalCalculatedBaths === 0) {
+    return { bedBathTextFormatted: null, bedsForPrompt: "Not specified", bathsForPrompt: "Not specified" };
+  }
+  const bedsStrDisplay = bedsCount > 0 ? `${bedsCount} Bed${bedsCount > 1 ? 's' : ''}` : "";
+  const bathsStrDisplay = totalCalculatedBaths > 0 ? `${totalCalculatedBaths} Bath${totalCalculatedBaths > 1 ? 's' : ''}` : "";
+  let combinedText: string | null = null;
+  if (bedsStrDisplay && bathsStrDisplay) combinedText = `${bedsStrDisplay} | ${bathsStrDisplay}`;
+  else if (bedsStrDisplay) combinedText = bedsStrDisplay;
+  else if (bathsStrDisplay) combinedText = bathsStrDisplay;
+  return { bedBathTextFormatted: combinedText, bedsForPrompt: bedsStrDisplay || "Not specified", bathsForPrompt: bathsStrDisplay || "Not specified" };
 };
 
 
@@ -175,35 +201,25 @@ async function connectAndStartServer() {
     teamsCollection = db.collection(teamsCollectionName);
     console.log(`Ensured collections: Listings='${listingsCollectionName}', Agents='${agentsCollectionName}', Teams='${teamsCollectionName}'`);
 
-    app.use('/api', authenticateToken);
-
+    app.use('/api', authenticateToken); // Apply auth to all /api routes
 
     app.get('/api/listings/:mlsId', async (req: ExpressRequest, res: ExpressResponse) => {
-      const authReq = req as AuthenticatedRequest;
-      const { mlsId } = authReq.params;
-      console.log(`User ${authReq.user?.uid} requesting listing ${mlsId}`);
-      if (!listingsCollection) {
-        return res.status(503).json({ message: 'Listings collection not initialized.' });
-      }
+      const { mlsId } = req.params; // Already an AuthenticatedRequest due to middleware
       try {
         const listing = await listingsCollection.findOne({ ListingId: mlsId });
         if (listing) {
-          res.json(listing);
+          // Ensure _id is not sent or stringified if present
+          const { _id, ...listingData } = listing;
+          res.json(listingData);
         } else {
           res.status(404).json({ message: `Listing with MLS ID ${mlsId} not found.` });
         }
       } catch (error) {
-        console.error(`Error fetching listing for MLS ID ${mlsId}:`, error);
-        res.status(500).json({ message: 'Internal server error while fetching listing.' });
+        res.status(500).json({ message: 'Internal server error fetching listing.' });
       }
     });
 
     app.get('/api/agents', async (req: ExpressRequest, res: ExpressResponse) => {
-        const authReq = req as AuthenticatedRequest;
-        console.log(`User ${authReq.user?.uid} requesting agents`);
-      if (!agentsCollection) {
-        return res.status(503).json({ message: 'Agents collection not initialized.' });
-      }
       try {
         const agents = await agentsCollection.find({}).toArray();
         const mappedAgents = agents.map(agentDoc => {
@@ -212,17 +228,11 @@ async function connectAndStartServer() {
         });
         res.json(mappedAgents);
       } catch (error) {
-        console.error('Error fetching agents:', error);
-        res.status(500).json({ message: 'Internal server error while fetching agents.' });
+        res.status(500).json({ message: 'Internal server error fetching agents.' });
       }
     });
 
     app.get('/api/teams', async (req: ExpressRequest, res: ExpressResponse) => {
-        const authReq = req as AuthenticatedRequest;
-        console.log(`User ${authReq.user?.uid} requesting teams`);
-      if (!teamsCollection) {
-        return res.status(503).json({ message: 'Teams collection not initialized.' });
-      }
       try {
         const teams = await teamsCollection.find({}).toArray();
         const mappedTeams = teams.map(teamDoc => {
@@ -231,10 +241,88 @@ async function connectAndStartServer() {
         });
         res.json(mappedTeams);
       } catch (error) {
-        console.error('Error fetching teams:', error);
-        res.status(500).json({ message: 'Internal server error while fetching teams.' });
+        res.status(500).json({ message: 'Internal server error fetching teams.' });
       }
     });
+
+    // New AI Description Generation Endpoint
+    app.post('/api/generate-instagram-description', async (req: ExpressRequest, res: ExpressResponse) => {
+        const authReq = req as AuthenticatedRequest;
+        console.log(`User ${authReq.user?.uid} requesting Instagram description generation.`);
+        const { listing, agentName } = req.body as { listing: Listing, agentName: string | null };
+
+        if (!listing) {
+            return res.status(400).json({ message: "Listing data is required." });
+        }
+
+        const { bedBathTextFormatted, bedsForPrompt, bathsForPrompt } = getBedBathDisplayInfoForServer(listing);
+        const address = listing.UnparsedAddress 
+            ? listing.UnparsedAddress 
+            : `${listing.StreetName}, ${listing.City}`;
+
+        let propertySpecificsForPromptSegment = `*   Address: ${address}\n`;
+        if (bedBathTextFormatted) {
+            propertySpecificsForPromptSegment += `    *   Features: ${bedBathTextFormatted}\n`;
+        }
+        propertySpecificsForPromptSegment += `    *   Listed by: ${agentName || 'Our Dedicated Team'}`;
+
+        const prompt = `
+You are a helpful real estate marketing assistant. Your task is to generate an engaging and concise Instagram post description for the property detailed below.
+
+Follow this structure and tone precisely:
+
+1.  **Introduction Emoji and Question/Statement:** Start with a catchy emoji (e.g., 🏡, ✨, 🔑, 🌊) followed by an intriguing question or a bold statement to grab the reader's attention immediately.
+2.  **Detailed Description:** Provide a brief but vivid description of the property, highlighting 2-3 key features or unique selling points from the "Property description from DB". Focus on what makes it special (e.g., views, finishes, lifestyle). Keep this concise.
+3.  **Family and Pet Friendliness (Optional but Recommended):** If the "Property description from DB" mentions features suitable for families or pets (e.g., "Pet Friendly", "dog park", "fenced yard", "spacious rooms"), briefly highlight them. If not explicitly mentioned, you can omit this or make a general positive statement if appropriate (e.g., "A wonderful place to call home.").
+4.  **Property Specifics (NO EMOJIS HERE):**
+    ${propertySpecificsForPromptSegment}
+5.  **Call to Action:** Encourage potential buyers to take the next step with a clear and concise call to action. Example: "Ready for a tour? Contact us today!" or "DM for details & showings!"
+6.  **Hashtags:** Conclude with 5-7 relevant and effective hashtags. Include general real estate tags, location-specific tags (e.g., #${listing.City.replace(/\s+/g, '')}Living, #${listing.City.replace(/\s+/g, '')}RealEstate), and feature-specific tags if applicable.
+
+**Property Information to Use (for your reference during generation):**
+
+Property Address: "${address}"
+Bedrooms: "${bedsForPrompt}"
+Bathrooms: "${bathsForPrompt}"
+Agent's Name: "${agentName || 'Our Dedicated Team'}"
+City for Hashtags: "${listing.City}"
+Property description from DB:
+"""
+${listing.PublicRemarks}
+"""
+
+**Important Instructions:**
+-   **Conciseness:** Instagram posts should be easy to read. Aim for an engaging summary, not a full novel.
+-   **Emoji Use:** Use emojis thoughtfully at the beginning and possibly in the detailed description for visual appeal. DO NOT use emojis in the "Property Specifics" section.
+-   **Tone:** Enthusiastic, inviting, and professional.
+-   **Accuracy:** Ensure the address, agent name, and other details are reflected correctly based on the "Property Information to Use" section.
+-   **Bed/Bath Handling:** If "Bedrooms" or "Bathrooms" fields in "Property Information to Use" are marked as "Not specified", DO NOT include the "Features" line for bed/bath counts in the "Property Specifics" section of your output. Focus on other aspects of the property if bed/bath information is not applicable.
+
+---
+Now, generate the Instagram post for the property with Address: "${address}", City for Hashtags: "${listing.City}", "Property description from DB": "${listing.PublicRemarks}", to be listed by "${agentName || 'Our Dedicated Team'}".
+${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` : 'For this property, bed and bath counts are either not specified or may not be applicable (e.g., vacant land). If so, do not mention beds or baths in the "Property Specifics" section of your output.'}
+`;
+        try {
+            console.log("Sending request to Gemini API...");
+            const response: GenerateContentResponse = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-preview-04-17', // Correct model
+                contents: prompt,
+            });
+            const textContent = response.text;
+             console.log("Received response from Gemini API.");
+
+            if (typeof textContent === 'string') {
+                res.json({ description: textContent });
+            } else {
+                console.error('Gemini API response.text is undefined.');
+                throw new Error('AI response was empty or malformed.');
+            }
+        } catch (error: any) {
+            console.error("Error calling Gemini API via server:", error);
+            res.status(500).json({ message: `Failed to generate description from AI: ${error.message}` });
+        }
+    });
+
 
     const distFrontendPath = path.join(process.cwd(), 'dist_frontend');
     app.use('/dist_frontend', express.static(distFrontendPath, {
@@ -247,37 +335,28 @@ async function connectAndStartServer() {
       })
     );
 
-    const mainScriptPath = path.join(distFrontendPath, 'index.js');
-    if (!fs.existsSync(mainScriptPath)) {
-      console.warn(`WARNING: Frontend entry point NOT FOUND: ${mainScriptPath}`);
-    } else {
-      console.log(`Frontend entry point found: ${mainScriptPath}`);
-    }
-
     const indexPath = path.join(process.cwd(), 'index.html');
     app.get('*', (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => {
       if (req.path.startsWith('/api/')) {
-        return next();
+        return next(); // Skip API calls for static serving
       }
       res.sendFile(indexPath, (err) => {
         if (err) {
-          console.error(`Error sending index.html for path ${req.path}.`, err);
           if (!res.headersSent) {
             res.status((err as any).status || 500).send('Error serving application.');
           }
         }
       });
     });
-
+    
+    // Catch-all for /api routes not found (should be after all API routes)
     app.use('/api/*', (req: ExpressRequest, res: ExpressResponse) => {
       res.status(404).json({ message: `API endpoint not found: ${req.method} ${req.originalUrl}` });
     });
 
     const errorHandler: ErrorRequestHandler = (err: any, req: ExpressRequest, res: ExpressResponse, _next: ExpressNextFunction) => {
-      console.error("Unhandled error:", err.stack || err);
+      console.error("Unhandled error in errorHandler:", err.stack || err);
       if (res.headersSent) {
-        // If headers are already sent, delegate to the default Express error handler.
-        // It's important to pass all four arguments to _next for it to be recognized as an error handler.
         return _next(err);
       }
       if (err.message && err.message.includes('Not allowed by CORS')) {
@@ -294,7 +373,7 @@ async function connectAndStartServer() {
     });
 
   } catch (err) {
-    console.error(`Failed to connect to MongoDB, initialize collections, or start server.`, err);
+    console.error(`Server startup failed:`, err);
     process.exit(1);
   }
 }

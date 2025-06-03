@@ -18,14 +18,11 @@ const getBedBathDisplayForDetails = (listing: Listing): string | null => {
     totalBaths += listing.BathroomsTotalInteger;
   }
   if (listing.BathroomsPartial && listing.BathroomsPartial > 0) {
-    totalBaths += listing.BathroomsPartial; // Simple sum as per previous logic
+    totalBaths += listing.BathroomsPartial; 
   }
   
   let bathsStr = "";
   if (totalBaths > 0) {
-    // Could be refined to show "2.5 Baths" if partial was treated as 0.5,
-    // but current AI logic sums them as whole numbers for "X Baths".
-    // For consistency in PropertyDetails, we'll do the same.
     bathsStr = `${totalBaths} Bath${totalBaths > 1 ? 's' : ''}`;
   }
 
@@ -36,12 +33,15 @@ const getBedBathDisplayForDetails = (listing: Listing): string | null => {
   } else if (bathsStr) {
     return bathsStr;
   }
-  return null; // No bed/bath info to display
+  return null;
 };
 
 
 export const PropertyDetails: React.FC<PropertyDetailsProps> = ({ listing }) => {
   const bedBathInfo = getBedBathDisplayForDetails(listing);
+  const displayAddress = listing.UnparsedAddress 
+    ? listing.UnparsedAddress 
+    : `${listing.StreetName}, ${listing.City}`;
 
   return (
     <div className="space-y-4 text-slate-700">
@@ -52,7 +52,7 @@ export const PropertyDetails: React.FC<PropertyDetailsProps> = ({ listing }) => 
         </div>
         <div>
           <p className="font-semibold">Address:</p>
-          <p>{listing.StreetName}, {listing.City}</p>
+          <p>{displayAddress}</p>
         </div>
         <div>
           <p className="font-semibold">Price:</p>
@@ -67,7 +67,7 @@ export const PropertyDetails: React.FC<PropertyDetailsProps> = ({ listing }) => 
           <p>{listing.OfficeName}</p>
         </div>
         {bedBathInfo && (
-          <div className="md:col-span-2"> {/* Span across columns or place appropriately */}
+          <div className="md:col-span-2">
             <p className="font-semibold">Features:</p>
             <p>{bedBathInfo}</p>
           </div>

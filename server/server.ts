@@ -119,7 +119,7 @@ const corsOptions: CorsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '5mb' })); // Increase limit if sending large listing data
+app.use(express.json({ limit: '5mb' })); 
 
 let db: Db;
 let listingsCollection: Collection;
@@ -201,10 +201,10 @@ async function connectAndStartServer() {
     teamsCollection = db.collection(teamsCollectionName);
     console.log(`Ensured collections: Listings='${listingsCollectionName}', Agents='${agentsCollectionName}', Teams='${teamsCollectionName}'`);
 
-    app.use('/api', authenticateToken); // Apply auth to all /api routes
+    app.use('/api', authenticateToken);
 
     app.get('/api/listings/:mlsId', async (req: ExpressRequest, res: ExpressResponse) => {
-      const { mlsId } = req.params; // Already an AuthenticatedRequest due to middleware
+      const { mlsId } = req.params; 
       try {
         const listing = await listingsCollection.findOne({ ListingId: mlsId });
         if (listing) {
@@ -215,6 +215,7 @@ async function connectAndStartServer() {
           res.status(404).json({ message: `Listing with MLS ID ${mlsId} not found.` });
         }
       } catch (error) {
+        console.error('Error fetching listing:', error);
         res.status(500).json({ message: 'Internal server error fetching listing.' });
       }
     });
@@ -228,6 +229,7 @@ async function connectAndStartServer() {
         });
         res.json(mappedAgents);
       } catch (error) {
+        console.error('Error fetching agents:', error);
         res.status(500).json({ message: 'Internal server error fetching agents.' });
       }
     });
@@ -241,6 +243,7 @@ async function connectAndStartServer() {
         });
         res.json(mappedTeams);
       } catch (error) {
+        console.error('Error fetching teams:', error);
         res.status(500).json({ message: 'Internal server error fetching teams.' });
       }
     });
@@ -327,7 +330,7 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
     const distFrontendPath = path.join(process.cwd(), 'dist_frontend');
     app.use('/dist_frontend', express.static(distFrontendPath, {
         extensions: ['js'],
-        setHeaders: (res: ExpressResponse, filePath: string) => {
+        setHeaders: (res: ExpressResponse, filePath: string) => { // Ensure ExpressResponse for res
           if (filePath.endsWith('.js')) {
             res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
           }
@@ -338,7 +341,7 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
     const indexPath = path.join(process.cwd(), 'index.html');
     app.get('*', (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => {
       if (req.path.startsWith('/api/')) {
-        return next(); // Skip API calls for static serving
+        return next(); 
       }
       res.sendFile(indexPath, (err) => {
         if (err) {

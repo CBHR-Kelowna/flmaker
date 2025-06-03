@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { UserProfile, Listing, Agent, Team, ImageEditState, Area, Point, GeneratePackageParams, ImageAnalysisResult, ProcessedPackageResult } from '../../types';
-import type { User as FirebaseUser } from 'firebase/auth'; // Ensured User type import, aliased for consistency
+import type { User as FirebaseUser } from 'firebase/auth'; 
 
 import { SearchBar } from '../SearchBar';
 import { PropertyDetails } from '../PropertyDetails';
@@ -34,8 +34,8 @@ const calculateDefaultCrop = (imgWidth: number, imgHeight: number): Area => {
 };
 
 interface CreateListingPageProps {
-  currentUser: FirebaseUser; // Use aliased type
-  userProfile: UserProfile | null; // Can be null if still loading or error
+  currentUser: FirebaseUser; 
+  userProfile: UserProfile | null; 
   mlsIdFromUrl?: string;
 }
 

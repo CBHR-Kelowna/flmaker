@@ -1,7 +1,15 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import type { User, Auth } from 'firebase/auth'; // Direct type imports
-import * as firebaseAuth from 'firebase/auth'; // Namespaced import for auth functions
+import { 
+  type User, 
+  type Auth, 
+  onAuthStateChanged, 
+  createUserWithEmailAndPassword, 
+  updateProfile, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  sendPasswordResetEmail 
+} from 'firebase/auth'; 
 
 import { auth as firebaseAuthService } from '../services/firebaseService'; 
 
@@ -38,7 +46,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const clearError = () => setError(null);
 
   useEffect(() => {
-    const unsubscribe = firebaseAuth.onAuthStateChanged(firebaseAuthService, (user) => {
+    const unsubscribe = onAuthStateChanged(firebaseAuthService, (user) => {
       setCurrentUser(user);
       setLoading(false);
     });
@@ -49,9 +57,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
     setLoading(true);
     try {
-      const userCredential = await firebaseAuth.createUserWithEmailAndPassword(firebaseAuthService, email, password);
+      const userCredential = await createUserWithEmailAndPassword(firebaseAuthService, email, password);
       if (displayName && userCredential.user) {
-        await firebaseAuth.updateProfile(userCredential.user, { displayName });
+        await updateProfile(userCredential.user, { displayName });
       }
       // onAuthStateChanged will handle setting currentUser
     } catch (err: any) {
@@ -66,7 +74,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
     setLoading(true);
     try {
-      await firebaseAuth.signInWithEmailAndPassword(firebaseAuthService, email, password);
+      await signInWithEmailAndPassword(firebaseAuthService, email, password);
       // onAuthStateChanged will handle setting currentUser
     } catch (err: any) {
       setError(err.message || "Failed to log in.");
@@ -80,7 +88,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
     setLoading(true);
     try {
-      await firebaseAuth.signOut(firebaseAuthService);
+      await signOut(firebaseAuthService);
       // onAuthStateChanged will handle setting currentUser to null
     } catch (err: any) {
       setError(err.message || "Failed to log out.");
@@ -93,7 +101,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const sendPasswordResetEmail = async (email: string) => {
     setError(null);
     try {
-      await firebaseAuth.sendPasswordResetEmail(firebaseAuthService, email);
+      await sendPasswordResetEmail(firebaseAuthService, email);
     } catch (err: any) {
       setError(err.message || "Failed to send password reset email.");
       console.error("Password Reset Error:", err);

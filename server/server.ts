@@ -1,6 +1,5 @@
 
-import express from 'express';
-import type { Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
+import express, { Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
 import { Collection, Db, MongoClient, FindOptions, ObjectId } from 'mongodb'; // Added ObjectId and FindOptions
 import cors, { CorsOptions } from 'cors';
 import path from 'path';
@@ -9,7 +8,7 @@ import fs from 'fs';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import type { Listing, UserProfile } from '../types'; // Import UserProfile
-import type { IncomingMessage, ServerResponse as NodeServerResponse } from 'http'; // For express.static setHeaders, renamed to avoid conflict
+import type { ServerResponse as NodeServerResponse } from 'http'; // For express.static setHeaders
 
 // --- Environment Variable Loading and Diagnostics ---
 const envPathUsed = path.resolve((process as NodeJS.Process).cwd(), '.env');
@@ -35,15 +34,12 @@ if (!serviceAccountPathFromEnv) {
     (process as NodeJS.Process).exit(1);
 }
 
-// Explicitly ensure serviceAccountPath is a string before using with fs
-const serviceAccountPath: string = serviceAccountPathFromEnv;
-
 try {
-    if (!fs.existsSync(serviceAccountPath)) { // Now serviceAccountPath is definitely a string
-        console.error(`FATAL ERROR: Service account key file not found at path: ${serviceAccountPath}`);
+    if (!fs.existsSync(serviceAccountPathFromEnv)) { 
+        console.error(`FATAL ERROR: Service account key file not found at path: ${serviceAccountPathFromEnv}`);
         (process as NodeJS.Process).exit(1);
     }
-    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8')); // serviceAccountPath is a string
+    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPathFromEnv, 'utf8')); 
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount)
     });
@@ -65,7 +61,7 @@ console.log("Google GenAI SDK initialized.");
 // --- End Gemini AI Initialization ---
 
 
-interface AuthenticatedRequest extends Request {
+interface AuthenticatedRequest extends express.Request { // Extend express.Request
   user?: admin.auth.DecodedIdToken;
 }
 
@@ -122,7 +118,7 @@ if (!mongoUri || !dbName) {
 const client = new MongoClient(mongoUri!);
 
 const authenticateToken: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-  const authReq = req as AuthenticatedRequest;
+  const authReq = req as AuthenticatedRequest; // Use the extended interface
   const authHeader = authReq.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ message: 'Authentication token required (Bearer).' });
@@ -133,7 +129,7 @@ const authenticateToken: RequestHandler = async (req: Request, res: Response, ne
   }
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
-    authReq.user = decodedToken;
+    authReq.user = decodedToken; // Attach user to the extended request object
     next();
   } catch (error: any) {
     console.error('Auth middleware: Invalid token.', error.message);

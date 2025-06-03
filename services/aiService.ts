@@ -22,6 +22,18 @@ const getAuthHeader = async (): Promise<HeadersInit> => {
   return headers;
 };
 
+const handleFetchError = async (response: Response, defaultMessage: string): Promise<Error> => {
+    if (response.status === 401 || response.status === 403) {
+        return new Error(`Authentication error (${response.status}) with AI service. Please log in again.`);
+    }
+    try {
+        const errorData = await response.json();
+        return new Error(errorData.message || `${defaultMessage}. Status: ${response.status}`);
+    } catch (e) {
+        return new Error(`${defaultMessage}. Status: ${response.status}. Response not in expected JSON format.`);
+    }
+};
+
 
 export const generateInstagramPostDescription = async (listing: Listing, agentName: string | null): Promise<string> => {
   try {
@@ -33,8 +45,7 @@ export const generateInstagramPostDescription = async (listing: Listing, agentNa
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: `Failed to generate description. Status: ${response.status}` }));
-      throw new Error(errorData.message || `Failed to generate description. Status: ${response.status}`);
+      throw await handleFetchError(response, 'Failed to generate description');
     }
 
     const result = await response.json();
@@ -43,8 +54,11 @@ export const generateInstagramPostDescription = async (listing: Listing, agentNa
     }
     throw new Error('Failed to generate description: AI response was malformed.');
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error calling backend for Instagram description:", error);
+    if (error.message && error.message.toLowerCase().includes('failed to fetch')) {
+        throw new Error('Network error: Could not reach AI service on server. Please check your internet connection and server status.');
+    }
     if (error instanceof Error) {
         throw error; // Re-throw existing error
     }

@@ -41,6 +41,7 @@ module.exports = {
       MONGODB_LISTINGS_COLLECTION: getEnvVar('MONGODB_LISTINGS_COLLECTION', 'Listings'),
       MONGODB_AGENTS_COLLECTION: getEnvVar('MONGODB_AGENTS_COLLECTION', 'Agents'),
       MONGODB_TEAMS_COLLECTION: getEnvVar('MONGODB_TEAMS_COLLECTION', 'Teams'),
+      MONGODB_USERPROFILES_COLLECTION: getEnvVar('MONGODB_USERPROFILES_COLLECTION', 'UserProfiles'), // Added
       GOOGLE_APPLICATION_CREDENTIALS: getEnvVar('GOOGLE_APPLICATION_CREDENTIALS'),
       API_KEY: getEnvVar('API_KEY')
       // Add any other environment variables your application needs

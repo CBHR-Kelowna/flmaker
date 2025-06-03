@@ -4,6 +4,7 @@ export interface Listing {
   ListingId: string; // MLS
   ListingKey: string;
   ListAgentKey: string;
+  CoListAgentKey?: string; // Added for dashboard query
   City: string;
   StreetName: string;
   UnparsedAddress?: string; // New field for full address
@@ -13,21 +14,21 @@ export interface Listing {
   OfficeName: string;
   Latitude: number;
   Longitude: number;
-  BedroomsTotal?: number; // New field
-  BathroomsTotalInteger?: number; // New field
-  BathroomsPartial?: number; // New field
+  BedroomsTotal?: number; 
+  BathroomsTotalInteger?: number; 
+  BathroomsPartial?: number; 
 }
 
 export interface Agent {
   id: string;
   name: string;
-  overlayImage: string; // URL to agent's 1080x1080 overlay image
+  overlayImage: string; 
 }
 
 export interface Team {
   id: string;
   name: string;
-  overlayLogo: string; // URL to team's 1080x1080 overlay logo
+  overlayLogo: string; 
 }
 
 // For react-easy-crop
@@ -54,7 +55,7 @@ export interface ImageEditState {
 export interface GeneratePackageParams {
   orderedSelectedImageUrls: string[];
   imageEditStates: { [url: string]: ImageEditState };
-  overlay?: { // Only one of agent or team should ideally be present based on selection logic
+  overlay?: { 
     agent?: Agent;
     team?: Team;
   };
@@ -62,16 +63,24 @@ export interface GeneratePackageParams {
   targetHeight: number;
 }
 
-// New type for image analysis results
 export interface ImageAnalysisResult {
-  hasSignificantStrips?: boolean; // This flag indicates if aspect ratio is problematic for 1:1
-  isPotentiallyLowResolution?: boolean; // This flag indicates if image resolution is low for target
-  naturalWidth?: number; // New: Original width of the image
-  naturalHeight?: number; // New: Original height of the image
+  hasSignificantStrips?: boolean; 
+  isPotentiallyLowResolution?: boolean; 
+  naturalWidth?: number; 
+  naturalHeight?: number; 
 }
 
 export interface ProcessedPackageResult {
   successfulImages: string[];
   failedImageOriginalUrls: string[];
-  imageAnalysis: { [originalUrl: string]: ImageAnalysisResult }; // For post-generation analysis/logging
+  imageAnalysis: { [originalUrl: string]: ImageAnalysisResult }; 
+}
+
+// New UserProfile interface
+export interface UserProfile {
+  firebaseUID: string;
+  agentKey: string | null;
+  email: string;
+  displayName?: string | null; // displayName from Firebase can be null
+  // lastUpdated?: string; // ISO date string
 }

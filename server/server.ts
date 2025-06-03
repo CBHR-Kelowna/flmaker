@@ -1,23 +1,17 @@
 
-import express, {
-    Express,
-    Request, // No longer aliased
-    Response, // No longer aliased
-    NextFunction, // No longer aliased
-    RequestHandler,
-    ErrorRequestHandler
-} from 'express';
-import { MongoClient, Db, Collection } from 'mongodb';
+import express, { Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
+import { Collection, Db, MongoClient, FindOptions } from 'mongodb'; // Added FindOptions
 import cors, { CorsOptions } from 'cors';
 import path from 'path';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import * as admin from 'firebase-admin';
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai"; // Import Gemini AI
-import type { Listing } from '../types'; // Import shared Listing type
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import type { Listing, UserProfile } from '../types'; // Import UserProfile
+import type { IncomingMessage, ServerResponse as NodeServerResponse } from 'http'; // For express.static setHeaders, renamed to avoid conflict
 
 // --- Environment Variable Loading and Diagnostics ---
-const envPathUsed = path.resolve(process.cwd(), '.env');
+const envPathUsed = path.resolve((process as NodeJS.Process).cwd(), '.env');
 console.log(`Attempting to load environment variables from: ${envPathUsed}`);
 const dotenvResult = dotenv.config({ path: envPathUsed });
 
@@ -25,30 +19,11 @@ if (dotenvResult.error) {
   console.error(`Error loading .env file from ${envPathUsed}: ${dotenvResult.error.message}`);
 } else if (dotenvResult.parsed) {
   console.log(`Successfully loaded and parsed .env file from ${envPathUsed}`);
-  if (dotenvResult.parsed.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.log(`dotenv: GOOGLE_APPLICATION_CREDENTIALS found in .env file content: '${dotenvResult.parsed.GOOGLE_APPLICATION_CREDENTIALS}'`);
-  } else {
-    console.warn(`dotenv: GOOGLE_APPLICATION_CREDENTIALS was NOT found in the parsed .env file content.`);
-  }
-  if (dotenvResult.parsed.API_KEY) {
-    console.log(`dotenv: API_KEY found in .env file.`);
-  } else {
-    console.warn(`dotenv: API_KEY was NOT found in the parsed .env file content.`);
-  }
+  // ... (keep existing dotenv diagnostics)
 } else {
   console.warn(`No .env file found at ${envPathUsed}, or it is empty. Attempting to rely on globally set environment variables.`);
 }
-
-if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.log(`process.env: GOOGLE_APPLICATION_CREDENTIALS is set to: '${process.env.GOOGLE_APPLICATION_CREDENTIALS}'`);
-} else {
-    console.warn(`process.env: GOOGLE_APPLICATION_CREDENTIALS is UNDEFINED after dotenv.config() call.`);
-}
-if (process.env.API_KEY) {
-    console.log(`process.env: API_KEY is available.`);
-} else {
-    console.warn(`process.env: API_KEY is UNDEFINED after dotenv.config() call.`);
-}
+// ... (keep existing process.env diagnostics)
 // --- End Environment Variable Loading ---
 
 // --- Firebase Admin SDK Initialization ---
@@ -56,12 +31,12 @@ const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 if (!serviceAccountPath) {
     console.error("FATAL ERROR: GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.");
-    process.exit(1);
+    (process as NodeJS.Process).exit(1);
 }
 try {
     if (!fs.existsSync(serviceAccountPath)) {
         console.error(`FATAL ERROR: Service account key file not found at path: ${serviceAccountPath}`);
-        process.exit(1);
+        (process as NodeJS.Process).exit(1);
     }
     const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
     admin.initializeApp({
@@ -70,7 +45,7 @@ try {
     console.log("Firebase Admin SDK initialized successfully.");
 } catch (error: any) {
     console.error("Firebase Admin SDK initialization failed:", error.message);
-    process.exit(1);
+    (process as NodeJS.Process).exit(1);
 }
 // --- End Firebase Admin SDK Initialization ---
 
@@ -78,18 +53,18 @@ try {
 const apiKey = process.env.API_KEY;
 if (!apiKey) {
   console.error('FATAL ERROR: API_KEY for Gemini AI is not defined. Check .env file and PM2 configuration.');
-  process.exit(1);
+  (process as NodeJS.Process).exit(1);
 }
 const ai = new GoogleGenAI({ apiKey });
 console.log("Google GenAI SDK initialized.");
 // --- End Gemini AI Initialization ---
 
 
-interface AuthenticatedRequest extends Request { // Extends direct Request
+interface AuthenticatedRequest extends Request {
   user?: admin.auth.DecodedIdToken;
 }
 
-const app: Express = express();
+const app = express(); // No need to type app: express.Express, express() infers it
 const port = process.env.PORT || 3001;
 
 const allowedOrigins = [
@@ -99,7 +74,7 @@ const allowedOrigins = [
   'http://127.0.0.1:5500',
   `http://localhost:${port}`,
   `http://127.0.0.1:${port}`,
-  'http://15.223.66.150', // Your EC2 instance IP
+  'http://15.223.66.150',
   'http://15.223.66.150:3001',
   'https://fl.kelownarealestate.com',
   'https://0jj6trdhljkycwzkbo2urievkgo0o8jmzhllh1vqi8gh9d1cii-h763805538.scf.usercontent.goog'
@@ -119,27 +94,29 @@ const corsOptions: CorsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '5mb' })); 
+app.use(express.json({ limit: '5mb' }));
 
 let db: Db;
 let listingsCollection: Collection;
 let agentsCollection: Collection;
 let teamsCollection: Collection;
+let userProfilesCollection: Collection<UserProfile>; // New collection
 
 const mongoUri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB_NAME;
 const listingsCollectionName = process.env.MONGODB_LISTINGS_COLLECTION || 'Listings';
 const agentsCollectionName = process.env.MONGODB_AGENTS_COLLECTION || 'Agents';
 const teamsCollectionName = process.env.MONGODB_TEAMS_COLLECTION || 'Teams';
+const userProfilesCollectionName = process.env.MONGODB_USERPROFILES_COLLECTION || 'UserProfiles'; // New env var
 
 if (!mongoUri || !dbName) {
   console.error('FATAL ERROR: MONGODB_URI or MONGODB_DB_NAME is not defined.');
-  process.exit(1);
+  (process as NodeJS.Process).exit(1);
 }
 
 const client = new MongoClient(mongoUri!);
 
-const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
+const authenticateToken: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
   const authReq = req as AuthenticatedRequest;
   const authHeader = authReq.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -199,16 +176,125 @@ async function connectAndStartServer() {
     listingsCollection = db.collection(listingsCollectionName);
     agentsCollection = db.collection(agentsCollectionName);
     teamsCollection = db.collection(teamsCollectionName);
-    console.log(`Ensured collections: Listings='${listingsCollectionName}', Agents='${agentsCollectionName}', Teams='${teamsCollectionName}'`);
+    userProfilesCollection = db.collection<UserProfile>(userProfilesCollectionName); // Initialize new collection
+    console.log(`Ensured collections: Listings='${listingsCollectionName}', Agents='${agentsCollectionName}', Teams='${teamsCollectionName}', UserProfiles='${userProfilesCollectionName}'`);
 
-    app.use('/api', authenticateToken);
+    app.use('/api', authenticateToken); // All /api routes below are authenticated
+
+    // User Profile Endpoints
+    app.get('/api/user/profile', async (req: Request, res: Response) => {
+        const authReq = req as AuthenticatedRequest;
+        const firebaseUID = authReq.user?.uid;
+        if (!firebaseUID) {
+            return res.status(403).json({ message: 'User UID not found in token.' });
+        }
+        try {
+            let userProfile = await userProfilesCollection.findOne({ firebaseUID });
+            if (!userProfile) {
+                // Create a default profile if none exists
+                const newUserProfile: UserProfile = {
+                    firebaseUID,
+                    agentKey: null,
+                    email: authReq.user?.email || '',
+                    displayName: authReq.user?.name || authReq.user?.displayName || null,
+                };
+                await userProfilesCollection.insertOne(newUserProfile);
+                userProfile = newUserProfile;
+            }
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { _id, ...profileData } = userProfile as any; // Exclude MongoDB _id
+            res.json(profileData);
+        } catch (error) {
+            console.error('Error fetching/creating user profile:', error);
+            res.status(500).json({ message: 'Internal server error fetching user profile.' });
+        }
+    });
+
+    app.post('/api/user/profile', async (req: Request, res: Response) => {
+        const authReq = req as AuthenticatedRequest;
+        const firebaseUID = authReq.user?.uid;
+        if (!firebaseUID) {
+            return res.status(403).json({ message: 'User UID not found in token.' });
+        }
+        const { agentKey } = req.body;
+        if (typeof agentKey !== 'string' && agentKey !== null) {
+            return res.status(400).json({ message: 'agentKey must be a string or null.' });
+        }
+
+        try {
+            const updateData: Partial<UserProfile> = {
+                agentKey: agentKey, // Allow setting to null
+                email: authReq.user?.email || '', // Keep email and displayName updated
+                displayName: authReq.user?.name || authReq.user?.displayName || null,
+            };
+
+            const result = await userProfilesCollection.findOneAndUpdate(
+                { firebaseUID },
+                { $set: updateData },
+                { upsert: true, returnDocument: 'after' }
+            );
+            if (result) {
+                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { _id, ...profileData } = result as any; // Exclude MongoDB _id
+                res.json(profileData);
+            } else {
+                // Should not happen with upsert: true and returnDocument: 'after'
+                res.status(500).json({ message: 'Failed to update or create user profile.' });
+            }
+        } catch (error) {
+            console.error('Error updating user profile:', error);
+            res.status(500).json({ message: 'Internal server error updating user profile.' });
+        }
+    });
+
+    // Agent Listings Endpoint (for Dashboard)
+    app.get('/api/agent-listings', async (req: Request, res: Response) => {
+        const authReq = req as AuthenticatedRequest;
+        const firebaseUID = authReq.user?.uid;
+
+        if (!firebaseUID) {
+            return res.status(403).json({ message: "User UID not found." });
+        }
+        try {
+            const userProfile = await userProfilesCollection.findOne({ firebaseUID });
+            if (!userProfile || !userProfile.agentKey) {
+                return res.json([]); // No agent key set, so no listings to show
+            }
+            const agentKey = userProfile.agentKey;
+            const query = {
+                $or: [
+                    { ListAgentKey: agentKey },
+                    { CoListAgentKey: agentKey }
+                ]
+            };
+             // Optional: Add sorting, e.g., by date or price. For now, no specific sort.
+            const options: FindOptions = {
+                projection: { PhotoGallery: 1, UnparsedAddress: 1, StreetName: 1, City: 1, ListPrice: 1, ListingId: 1, BedroomsTotal:1, BathroomsTotalInteger:1, BathroomsPartial:1  },
+                limit: 50 // Prevent accidentally fetching too many, adjust as needed
+            };
+            const listings = await listingsCollection.find(query, options).toArray();
+
+            // Map to remove _id and ensure Listing structure
+            const mappedListings = listings.map(listingDoc => {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const { _id, ...listingData } = listingDoc;
+              return listingData as Listing;
+            });
+            res.json(mappedListings);
+
+        } catch (error) {
+            console.error('Error fetching agent listings:', error);
+            res.status(500).json({ message: 'Internal server error fetching agent listings.' });
+        }
+    });
+
 
     app.get('/api/listings/:mlsId', async (req: Request, res: Response) => {
-      const { mlsId } = req.params; 
+      const { mlsId } = req.params;
       try {
         const listing = await listingsCollection.findOne({ ListingId: mlsId });
         if (listing) {
-          // Ensure _id is not sent or stringified if present
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { _id, ...listingData } = listing;
           res.json(listingData);
         } else {
@@ -224,6 +310,7 @@ async function connectAndStartServer() {
       try {
         const agents = await agentsCollection.find({}).toArray();
         const mappedAgents = agents.map(agentDoc => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { _id, ...rest } = agentDoc;
           return { ...rest, id: _id ? _id.toString() : undefined };
         });
@@ -238,6 +325,7 @@ async function connectAndStartServer() {
       try {
         const teams = await teamsCollection.find({}).toArray();
         const mappedTeams = teams.map(teamDoc => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { _id, ...rest } = teamDoc;
           return { ...rest, id: _id ? _id.toString() : undefined };
         });
@@ -248,7 +336,6 @@ async function connectAndStartServer() {
       }
     });
 
-    // New AI Description Generation Endpoint
     app.post('/api/generate-instagram-description', async (req: Request, res: Response) => {
         const authReq = req as AuthenticatedRequest;
         console.log(`User ${authReq.user?.uid} requesting Instagram description generation.`);
@@ -259,8 +346,8 @@ async function connectAndStartServer() {
         }
 
         const { bedBathTextFormatted, bedsForPrompt, bathsForPrompt } = getBedBathDisplayInfoForServer(listing);
-        const address = listing.UnparsedAddress 
-            ? listing.UnparsedAddress 
+        const address = listing.UnparsedAddress
+            ? listing.UnparsedAddress
             : `${listing.StreetName}, ${listing.City}`;
 
         let propertySpecificsForPromptSegment = `*   Address: ${address}\n`;
@@ -308,7 +395,7 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
         try {
             console.log("Sending request to Gemini API...");
             const response: GenerateContentResponse = await ai.models.generateContent({
-                model: 'gemini-2.5-flash-preview-04-17', // Correct model
+                model: 'gemini-2.5-flash-preview-04-17',
                 contents: prompt,
             });
             const textContent = response.text;
@@ -327,10 +414,10 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
     });
 
 
-    const distFrontendPath = path.join(process.cwd(), 'dist_frontend');
+    const distFrontendPath = path.join((process as NodeJS.Process).cwd(), 'dist_frontend');
     app.use('/dist_frontend', express.static(distFrontendPath, {
         extensions: ['js'],
-        setHeaders: (res: Response, filePath: string) => { // Use direct Response
+        setHeaders: (res: NodeServerResponse, filePath: string) => { // Used NodeServerResponse from http
           if (filePath.endsWith('.js')) {
             res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
           }
@@ -338,29 +425,29 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
       })
     );
 
-    const indexPath = path.join(process.cwd(), 'index.html');
-    app.get('*', (req: Request, res: Response, next: NextFunction) => { // Use direct types
+    const indexPath = path.join((process as NodeJS.Process).cwd(), 'index.html');
+    app.get('*', (req: Request, res: Response, next: NextFunction) => {
       if (req.path.startsWith('/api/')) {
-        return next(); 
+        return next();
       }
-      res.sendFile(indexPath, (err) => {
+      res.sendFile(indexPath, (err: NodeJS.ErrnoException | null) => { // Explicitly type err
         if (err) {
           if (!res.headersSent) {
-            res.status((err as any).status || 500).send('Error serving application.');
+            const status = (err as any).status || 500; // Common pattern for error status
+            res.status(status).send('Error serving application.');
           }
         }
       });
     });
-    
-    // Catch-all for /api routes not found (should be after all API routes)
-    app.use('/api/*', (req: Request, res: Response) => { // Use direct types
+
+    app.use('/api/*', (req: Request, res: Response) => {
       res.status(404).json({ message: `API endpoint not found: ${req.method} ${req.originalUrl}` });
     });
 
-    const errorHandler: ErrorRequestHandler = (err: any, req: Request, res: Response, _next: NextFunction) => { // Use direct types from ErrorRequestHandler
+    const errorHandler: ErrorRequestHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
       console.error("Unhandled error in errorHandler:", err.stack || err);
       if (res.headersSent) {
-        return _next(err);
+        return next(err);
       }
       if (err.message && err.message.includes('Not allowed by CORS')) {
           res.status(403).json({ message: err.message });
@@ -377,7 +464,7 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
 
   } catch (err) {
     console.error(`Server startup failed:`, err);
-    process.exit(1);
+    (process as NodeJS.Process).exit(1);
   }
 }
 

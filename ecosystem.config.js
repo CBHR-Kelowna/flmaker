@@ -28,7 +28,7 @@ const getEnvVar = (key, defaultValue = undefined) => {
 module.exports = {
   apps : [{
     name   : "featured-listing-maker",
-    script : "./server/dist/server.js",  // Path to the compiled server entry point
+    script : "./server/dist/server/server.js",  // Path to the compiled server entry point
     cwd    : "/var/www/featured-listing-maker/", // Current working directory FOR THE APP
                                                  // This is important so server.ts can find its own .env if needed
                                                  // and for relative paths within the app.

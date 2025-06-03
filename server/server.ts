@@ -1,9 +1,9 @@
 
 import express, {
     Express,
-    Request as ExpressRequest, // Aliased
-    Response as ExpressResponse, // Aliased
-    NextFunction as ExpressNextFunction, // Aliased
+    Request, // No longer aliased
+    Response, // No longer aliased
+    NextFunction, // No longer aliased
     RequestHandler,
     ErrorRequestHandler
 } from 'express';
@@ -85,7 +85,7 @@ console.log("Google GenAI SDK initialized.");
 // --- End Gemini AI Initialization ---
 
 
-interface AuthenticatedRequest extends ExpressRequest { 
+interface AuthenticatedRequest extends Request { // Extends direct Request
   user?: admin.auth.DecodedIdToken;
 }
 
@@ -139,7 +139,7 @@ if (!mongoUri || !dbName) {
 
 const client = new MongoClient(mongoUri!);
 
-const authenticateToken: RequestHandler = async (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => {
+const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
   const authReq = req as AuthenticatedRequest;
   const authHeader = authReq.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -203,7 +203,7 @@ async function connectAndStartServer() {
 
     app.use('/api', authenticateToken);
 
-    app.get('/api/listings/:mlsId', async (req: ExpressRequest, res: ExpressResponse) => {
+    app.get('/api/listings/:mlsId', async (req: Request, res: Response) => {
       const { mlsId } = req.params; 
       try {
         const listing = await listingsCollection.findOne({ ListingId: mlsId });
@@ -220,7 +220,7 @@ async function connectAndStartServer() {
       }
     });
 
-    app.get('/api/agents', async (req: ExpressRequest, res: ExpressResponse) => {
+    app.get('/api/agents', async (req: Request, res: Response) => {
       try {
         const agents = await agentsCollection.find({}).toArray();
         const mappedAgents = agents.map(agentDoc => {
@@ -234,7 +234,7 @@ async function connectAndStartServer() {
       }
     });
 
-    app.get('/api/teams', async (req: ExpressRequest, res: ExpressResponse) => {
+    app.get('/api/teams', async (req: Request, res: Response) => {
       try {
         const teams = await teamsCollection.find({}).toArray();
         const mappedTeams = teams.map(teamDoc => {
@@ -249,7 +249,7 @@ async function connectAndStartServer() {
     });
 
     // New AI Description Generation Endpoint
-    app.post('/api/generate-instagram-description', async (req: ExpressRequest, res: ExpressResponse) => {
+    app.post('/api/generate-instagram-description', async (req: Request, res: Response) => {
         const authReq = req as AuthenticatedRequest;
         console.log(`User ${authReq.user?.uid} requesting Instagram description generation.`);
         const { listing, agentName } = req.body as { listing: Listing, agentName: string | null };
@@ -330,7 +330,7 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
     const distFrontendPath = path.join(process.cwd(), 'dist_frontend');
     app.use('/dist_frontend', express.static(distFrontendPath, {
         extensions: ['js'],
-        setHeaders: (res: ExpressResponse, filePath: string) => { // Ensure ExpressResponse for res
+        setHeaders: (res: Response, filePath: string) => { // Use direct Response
           if (filePath.endsWith('.js')) {
             res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
           }
@@ -339,7 +339,7 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
     );
 
     const indexPath = path.join(process.cwd(), 'index.html');
-    app.get('*', (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => {
+    app.get('*', (req: Request, res: Response, next: NextFunction) => { // Use direct types
       if (req.path.startsWith('/api/')) {
         return next(); 
       }
@@ -353,11 +353,11 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
     });
     
     // Catch-all for /api routes not found (should be after all API routes)
-    app.use('/api/*', (req: ExpressRequest, res: ExpressResponse) => {
+    app.use('/api/*', (req: Request, res: Response) => { // Use direct types
       res.status(404).json({ message: `API endpoint not found: ${req.method} ${req.originalUrl}` });
     });
 
-    const errorHandler: ErrorRequestHandler = (err: any, req: ExpressRequest, res: ExpressResponse, _next: ExpressNextFunction) => {
+    const errorHandler: ErrorRequestHandler = (err: any, req: Request, res: Response, _next: NextFunction) => { // Use direct types from ErrorRequestHandler
       console.error("Unhandled error in errorHandler:", err.stack || err);
       if (res.headersSent) {
         return _next(err);

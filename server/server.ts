@@ -1,5 +1,5 @@
 
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express, { Express, Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
 import { MongoClient, Db, Collection } from 'mongodb';
 import cors, { CorsOptions } from 'cors';
 import path from 'path';
@@ -8,20 +8,35 @@ import fs from 'fs';
 import * as admin from 'firebase-admin'; // Import Firebase Admin SDK
 
 // --- Firebase Admin SDK Initialization ---
+const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+if (!serviceAccountPath) {
+    console.error("FATAL ERROR: GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.");
+    console.error("This variable should point to your Firebase service account key JSON file.");
+    process.exit(1);
+}
+
 try {
-    admin.initializeApp(); // Will use GOOGLE_APPLICATION_CREDENTIALS env var by default
-    console.log("Firebase Admin SDK initialized successfully.");
+    if (!fs.existsSync(serviceAccountPath)) {
+        console.error(`FATAL ERROR: Service account key file not found at path: ${serviceAccountPath}`);
+        console.error("Ensure GOOGLE_APPLICATION_CREDENTIALS points to a valid and readable JSON key file.");
+        process.exit(1);
+    }
+    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+    console.log("Firebase Admin SDK initialized successfully using service account file.");
 } catch (error: any) {
     console.error("Firebase Admin SDK initialization failed:", error.message);
-    console.error("Ensure GOOGLE_APPLICATION_CREDENTIALS environment variable is set correctly or initialize with credential object.");
-    process.exit(1); // Uses global process
+    console.error(`Error occurred while trying to use service account key from: ${serviceAccountPath}`);
+    if (error.code === 'ENOENT') {
+        console.error("Specific Error: Service account file not found. Please double-check the path and permissions.");
+    } else if (error instanceof SyntaxError) {
+        console.error("Specific Error: Failed to parse the service account JSON. Ensure the file is a valid JSON.");
+    }
+    process.exit(1);
 }
-
-// Extend Express Request type to include user
-interface AuthenticatedRequest extends Request {
-  user?: admin.auth.DecodedIdToken;
-}
-
 // --- End Firebase Admin SDK Initialization ---
 
 const dotenvResult = dotenv.config({ path: path.resolve(process.cwd(), '.env') }); // Uses global process
@@ -33,6 +48,11 @@ if (dotenvResult.error) {
   console.log(`Successfully loaded environment variables from ${envPathUsed}`);
 } else {
   console.warn(`No .env file found at ${envPathUsed}, or it is empty. Relying on globally set environment variables.`);
+}
+
+// Extend Express Request type to include user
+interface AuthenticatedRequest extends Request {
+  user?: admin.auth.DecodedIdToken;
 }
 
 const app: Express = express();
@@ -47,7 +67,8 @@ const allowedOrigins = [
   `http://127.0.0.1:${port}`,
   'http://15.223.66.150',
   'http://15.223.66.150:3001',
-  'https://fl.kelownarealestate.com'
+  'https://fl.kelownarealestate.com',
+  'https://0jj6trdhljkycwzkbo2urievkgo0o8jmzhllh1vqi8gh9d1cii-h763805538.scf.usercontent.goog' // Added new origin
 ];
 
 const corsOptions: CorsOptions = {
@@ -85,7 +106,7 @@ if (!mongoUri || !dbName) {
 const client = new MongoClient(mongoUri!);
 
 // Firebase Authentication Middleware
-const authenticateToken: express.RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+const authenticateToken: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
   const authReq = req as AuthenticatedRequest;
   const authHeader = authReq.headers.authorization;
 
@@ -107,7 +128,8 @@ const authenticateToken: express.RequestHandler = async (req: Request, res: Resp
     console.log(`Auth middleware: Token verified for UID ${decodedToken.uid}`);
     next();
   } catch (error: any) {
-    console.error('Auth middleware: Invalid token.', error.message);
+    console.error('Auth middleware: Invalid token.', error.message); // Keep detailed error logging
+    // Send a generic message to the client for security
     return res.status(403).json({ message: 'Invalid or expired authentication token.' });
   }
 };
@@ -224,17 +246,19 @@ async function connectAndStartServer() {
       res.status(404).json({ message: `API endpoint not found: ${req.method} ${req.originalUrl}` });
     });
 
-    app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+    const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       console.error("Unhandled error:", err.stack);
       if (res.headersSent) {
-        return _next(err);
+        return _next(err); // Delegate to default Express error handler if headers already sent
       }
       if (err.message && err.message.includes('Not allowed by CORS')) {
           res.status(403).json({ message: err.message });
       } else {
           res.status(500).json({message: 'Something broke on the server!'});
       }
-    });
+    };
+    app.use(errorHandler);
+
 
     app.listen(port, () => {
       console.log(`Backend server running at http://localhost:${port}`);

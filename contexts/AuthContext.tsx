@@ -8,7 +8,7 @@ import {
   updateProfile, 
   signInWithEmailAndPassword, 
   signOut, 
-  sendPasswordResetEmail 
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail // Aliased import
 } from 'firebase/auth'; 
 
 import { auth as firebaseAuthService } from '../services/firebaseService'; 
@@ -98,10 +98,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // This is the local context method
   const sendPasswordResetEmail = async (email: string) => {
     setError(null);
     try {
-      await sendPasswordResetEmail(firebaseAuthService, email);
+      // Call the aliased Firebase function with both auth instance and email
+      await firebaseSendPasswordResetEmail(firebaseAuthService, email); 
     } catch (err: any) {
       setError(err.message || "Failed to send password reset email.");
       console.error("Password Reset Error:", err);

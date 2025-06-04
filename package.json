@@ -2,6 +2,7 @@
   "name": "realty-social-packager-fullstack",
   "version": "1.0.0",
   "description": "Realty Social Packager with a Node.js backend",
+  "type": "module",
   "main": "server/server.ts",
   "scripts": {
     "build:frontend": "tsc -p ./tsconfig.json",

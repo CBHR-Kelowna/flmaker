@@ -19,11 +19,20 @@ if (dotenvResult.error) {
   console.error(`Error loading .env file from ${envPathUsed}: ${dotenvResult.error.message}`);
 } else if (dotenvResult.parsed) {
   console.log(`Successfully loaded and parsed .env file from ${envPathUsed}`);
-  // ... (keep existing dotenv diagnostics)
+  // Log specific .env variables critical for startup
+  console.log(`dotenv: MONGODB_URI ${dotenvResult.parsed.MONGODB_URI ? 'found' : 'NOT found'} in .env file content.`);
+  console.log(`dotenv: MONGODB_DB_NAME ${dotenvResult.parsed.MONGODB_DB_NAME ? 'found' : 'NOT found'} in .env file content.`);
+  console.log(`dotenv: GOOGLE_APPLICATION_CREDENTIALS ${dotenvResult.parsed.GOOGLE_APPLICATION_CREDENTIALS ? 'found' : 'NOT found'} in .env file content: '${dotenvResult.parsed.GOOGLE_APPLICATION_CREDENTIALS}'`);
+  console.log(`dotenv: API_KEY ${dotenvResult.parsed.API_KEY ? 'found' : 'NOT found'} in .env file.`);
 } else {
   console.warn(`No .env file found at ${envPathUsed}, or it is empty. Attempting to rely on globally set environment variables.`);
 }
-// ... (keep existing process.env diagnostics)
+
+// Log critical process.env variables (these might be set by PM2 or system)
+console.log(`process.env: MONGODB_URI is ${process.env.MONGODB_URI ? 'set' : 'NOT set'}.`);
+console.log(`process.env: MONGODB_DB_NAME is ${process.env.MONGODB_DB_NAME ? 'set' : 'NOT set'}.`);
+console.log(`process.env: GOOGLE_APPLICATION_CREDENTIALS is ${process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'set to: \'' + process.env.GOOGLE_APPLICATION_CREDENTIALS + '\'' : 'NOT set'}.`);
+console.log(`process.env: API_KEY is ${process.env.API_KEY ? 'available' : 'NOT available'}.`);
 // --- End Environment Variable Loading ---
 
 // --- Firebase Admin SDK Initialization ---
@@ -34,8 +43,7 @@ if (!serviceAccountPathFromEnv) {
     (process as any).exit(1);
 }
 
-// Assign to a new constant after the check to ensure TypeScript infers it as string.
-const definiteServiceAccountPath: string = serviceAccountPathFromEnv!; 
+const definiteServiceAccountPath: string = serviceAccountPathFromEnv!;
 
 try {
     if (!fs.existsSync(definiteServiceAccountPath)) {
@@ -65,9 +73,10 @@ console.log("Google GenAI SDK initialized.");
 // --- End Gemini AI Initialization ---
 
 
-interface AuthenticatedRequest extends ExpressRequest { // Extend aliased express.Request
+// Define AuthenticatedRequest as an intersection type
+type AuthenticatedRequest = ExpressRequest & {
   user?: admin.auth.DecodedIdToken;
-}
+};
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -82,7 +91,8 @@ const allowedOrigins = [
   'http://15.223.66.150',
   'http://15.223.66.150:3001',
   'https://fl.kelownarealestate.com',
-  'https://0jj6trdhljkycwzkbo2urievkgo0o8jmzhllh1vqi8gh9d1cii-h763805538.scf.usercontent.goog'
+  'https://0jj6trdhljkycwzkbo2urievkgo0o8jmzhllh1vqi8gh9d1cii-h763805538.scf.usercontent.goog',
+  'https://2oyvyw2kthy5r8q95jty195q3b6sc5z0asq3hm77939bs0ac5v-h763805538.scf.usercontent.goog' // Added new origin
 ];
 
 const corsOptions: CorsOptions = {
@@ -90,7 +100,7 @@ const corsOptions: CorsOptions = {
     if (!requestOrigin || allowedOrigins.some(origin => requestOrigin.startsWith(origin))) {
       callback(null, true);
     } else {
-      console.warn(`CORS: Origin '${requestOrigin}' blocked.`);
+      console.warn(`CORS: Origin '${requestOrigin}' blocked by defined policy.`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -105,14 +115,14 @@ let db: Db;
 let listingsCollection: Collection;
 let agentsCollection: Collection;
 let teamsCollection: Collection;
-let userProfilesCollection: Collection<UserProfile>; // New collection
+let userProfilesCollection: Collection<UserProfile>;
 
 const mongoUri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB_NAME;
 const listingsCollectionName = process.env.MONGODB_LISTINGS_COLLECTION || 'Listings';
 const agentsCollectionName = process.env.MONGODB_AGENTS_COLLECTION || 'Agents';
 const teamsCollectionName = process.env.MONGODB_TEAMS_COLLECTION || 'Teams';
-const userProfilesCollectionName = process.env.MONGODB_USERPROFILES_COLLECTION || 'UserProfiles'; // New env var
+const userProfilesCollectionName = process.env.MONGODB_USERPROFILES_COLLECTION || 'UserProfiles';
 
 if (!mongoUri || !dbName) {
   console.error('FATAL ERROR: MONGODB_URI or MONGODB_DB_NAME is not defined.');
@@ -132,7 +142,7 @@ const authenticateToken = async (req: AuthenticatedRequest, res: Response, next:
   }
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
-    req.user = decodedToken; // Attach user to the extended request object
+    req.user = decodedToken;
     next();
   } catch (error: any) {
     console.error('Auth middleware: Invalid token.', error.message);
@@ -140,7 +150,6 @@ const authenticateToken = async (req: AuthenticatedRequest, res: Response, next:
   }
 };
 
-// Helper function for AI prompt (similar to client-side one)
 const getBedBathDisplayInfoForServer = (listing: Listing): {
   bedBathTextFormatted: string | null;
   bedsForPrompt: string;
@@ -180,23 +189,26 @@ async function connectAndStartServer() {
     listingsCollection = db.collection(listingsCollectionName);
     agentsCollection = db.collection(agentsCollectionName);
     teamsCollection = db.collection(teamsCollectionName);
-    userProfilesCollection = db.collection<UserProfile>(userProfilesCollectionName); // Initialize new collection
-    console.log(`Ensured collections: Listings='${listingsCollectionName}', Agents='${agentsCollectionName}', Teams='${teamsCollectionName}', UserProfiles='${userProfilesCollectionName}'`);
+    userProfilesCollection = db.collection<UserProfile>(userProfilesCollectionName);
 
-    app.use('/api', authenticateToken); // All /api routes below are authenticated
+    // Updated log to be more robust
+    console.log(`Ensured collections: Listings='${listingsCollectionName}', Agents='${agentsCollectionName}', Teams='${teamsCollectionName}', UserProfiles='${userProfilesCollectionName}' (from MONGODB_USERPROFILES_COLLECTION env: ${process.env.MONGODB_USERPROFILES_COLLECTION || 'UserProfiles (default)'})`);
 
-    // User Profile Endpoints
-    console.log("Defining /api/user/profile GET route..."); // Diagnostic log
+
+    app.use('/api', authenticateToken);
+
+    console.log("Defining /api/user/profile GET route...");
     app.get('/api/user/profile', async (req: AuthenticatedRequest, res: Response) => {
-        console.log("Request received for /api/user/profile GET"); // Diagnostic log
+        console.log(`🔥🔥🔥 Entered GET /api/user/profile route handler for user: ${req.user?.uid} 🔥🔥🔥`); // Enhanced log
         const firebaseUID = req.user?.uid;
         if (!firebaseUID) {
+            console.warn("GET /api/user/profile: User UID not found in token after auth middleware.");
             return res.status(403).json({ message: 'User UID not found in token.' });
         }
         try {
             let userProfileDoc = await userProfilesCollection.findOne({ firebaseUID });
             if (!userProfileDoc) {
-                // Create a default profile if none exists
+                console.log(`GET /api/user/profile: No profile found for UID ${firebaseUID}, creating new one.`);
                 const newUserProfileData: UserProfile = {
                     firebaseUID,
                     agentKey: null,
@@ -204,23 +216,26 @@ async function connectAndStartServer() {
                     displayName: req.user?.name || req.user?.displayName || null,
                 };
                 const insertResult = await userProfilesCollection.insertOne(newUserProfileData);
-                userProfileDoc = { // Construct the document as if it were found, including the new _id
+                userProfileDoc = {
                     ...newUserProfileData,
                     _id: insertResult.insertedId,
-                } as UserProfile & {_id: ObjectId}; // Ensure _id type for consistency
+                } as UserProfile & {_id: ObjectId};
+                 console.log(`GET /api/user/profile: New profile created for UID ${firebaseUID} with ID ${userProfileDoc._id}.`);
+            } else {
+                 console.log(`GET /api/user/profile: Found profile for UID ${firebaseUID}.`);
             }
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { _id, ...profileData } = userProfileDoc as any; // Exclude MongoDB _id from response
+            const { _id, ...profileData } = userProfileDoc as any;
             res.json(profileData);
         } catch (error) {
-            console.error('Error fetching/creating user profile:', error);
+            console.error(`Error in GET /api/user/profile for UID ${firebaseUID}:`, error);
             res.status(500).json({ message: 'Internal server error fetching user profile.' });
         }
     });
 
-    console.log("Defining /api/user/profile POST route..."); // Diagnostic log
+    console.log("Defining /api/user/profile POST route...");
     app.post('/api/user/profile', async (req: AuthenticatedRequest, res: Response) => {
-        console.log("Request received for /api/user/profile POST"); // Diagnostic log
+        console.log(`Request received for /api/user/profile POST by user: ${req.user?.uid}`);
         const firebaseUID = req.user?.uid;
         if (!firebaseUID) {
             return res.status(403).json({ message: 'User UID not found in token.' });
@@ -232,9 +247,9 @@ async function connectAndStartServer() {
 
         try {
             const updateData: Partial<UserProfile> = {
-                agentKey: agentKey, // Allow setting to null
-                email: req.user?.email || '', // Keep email and displayName updated
-                displayName: req.user?.name || req.user?.displayName || null,
+                agentKey: agentKey,
+                email: req.user?.email || '', // ensure email is updated if it changed in Firebase
+                displayName: req.user?.name || req.user?.displayName || null, // ensure name is updated
             };
 
             const result = await userProfilesCollection.findOneAndUpdate(
@@ -243,7 +258,7 @@ async function connectAndStartServer() {
                 { upsert: true, returnDocument: 'after' }
             );
             if (result) {
-                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const { _id, ...profileData } = result as any;
                 res.json(profileData);
             } else {
@@ -256,17 +271,17 @@ async function connectAndStartServer() {
         }
     });
 
-    // Agent Listings Endpoint (for Dashboard)
     app.get('/api/agent-listings', async (req: AuthenticatedRequest, res: Response) => {
         const firebaseUID = req.user?.uid;
-
+        console.log(`Request for /api/agent-listings by user: ${firebaseUID}`);
         if (!firebaseUID) {
             return res.status(403).json({ message: "User UID not found." });
         }
         try {
             const userProfile = await userProfilesCollection.findOne({ firebaseUID });
             if (!userProfile || !userProfile.agentKey) {
-                return res.json([]); // No agent key set, so no listings to show
+                console.log(`No agentKey for user ${firebaseUID}, returning empty array for agent-listings.`);
+                return res.json([]);
             }
             const agentKey = userProfile.agentKey;
             const query = {
@@ -277,7 +292,7 @@ async function connectAndStartServer() {
             };
             const options: FindOptions = {
                 projection: { PhotoGallery: 1, UnparsedAddress: 1, StreetName: 1, City: 1, ListPrice: 1, ListingId: 1, BedroomsTotal:1, BathroomsTotalInteger:1, BathroomsPartial:1  },
-                limit: 50
+                limit: 50 // Consider making this configurable or adding pagination if lists can be very long
             };
             const listings = await listingsCollection.find(query, options).toArray();
 
@@ -297,6 +312,7 @@ async function connectAndStartServer() {
 
     app.get('/api/listings/:mlsId', async (req: AuthenticatedRequest, res: Response) => {
       const { mlsId } = req.params;
+      console.log(`Request for /api/listings/${mlsId} by user: ${req.user?.uid}`);
       try {
         const listing = await listingsCollection.findOne({ ListingId: mlsId });
         if (listing) {
@@ -313,12 +329,13 @@ async function connectAndStartServer() {
     });
 
     app.get('/api/agents', async (req: AuthenticatedRequest, res: Response) => {
+      console.log(`Request for /api/agents by user: ${req.user?.uid}`);
       try {
         const agents = await agentsCollection.find({}).toArray();
         const mappedAgents = agents.map(agentDoc => {
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { _id, ...rest } = agentDoc;
-          return { ...rest, id: _id ? _id.toString() : undefined };
+          return { ...rest, id: _id ? _id.toString() : undefined }; // Ensure ID is stringified if exists
         });
         res.json(mappedAgents);
       } catch (error) {
@@ -328,12 +345,13 @@ async function connectAndStartServer() {
     });
 
     app.get('/api/teams', async (req: AuthenticatedRequest, res: Response) => {
+      console.log(`Request for /api/teams by user: ${req.user?.uid}`);
       try {
         const teams = await teamsCollection.find({}).toArray();
         const mappedTeams = teams.map(teamDoc => {
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { _id, ...rest } = teamDoc;
-          return { ...rest, id: _id ? _id.toString() : undefined };
+          return { ...rest, id: _id ? _id.toString() : undefined }; // Ensure ID is stringified
         });
         res.json(mappedTeams);
       } catch (error) {
@@ -356,7 +374,7 @@ async function connectAndStartServer() {
             : `${listing.StreetName}, ${listing.City}`;
 
         let propertySpecificsForPromptSegment = `*   Address: ${address}\n`;
-        if (bedBathTextFormatted) {
+        if (bedBathTextFormatted) { // Only add if bedBathTextFormatted is not null
             propertySpecificsForPromptSegment += `    *   Features: ${bedBathTextFormatted}\n`;
         }
         propertySpecificsForPromptSegment += `    *   Listed by: ${agentName || 'Our Dedicated Team'}`;
@@ -420,18 +438,29 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
 
 
     const distFrontendPath = path.join((process as any).cwd(), 'dist_frontend');
-    // Simplified express.static: removed 'extensions' and specific 'setHeaders' for .js,
-    // as Express usually handles MIME types for .js correctly.
-    // This helps rule out complex options as a source of the "text/html" MIME type error for index.js.
-    app.use('/dist_frontend', express.static(distFrontendPath));
+    console.log(`Serving static files from /dist_frontend mapped to path: ${distFrontendPath}`);
+    app.use('/dist_frontend', express.static(distFrontendPath, {
+      // Explicitly set headers for JS files to try and combat MIME type issues if Express fails.
+      setHeaders: (res: NodeServerResponse, filePath: string) => {
+        if (filePath.endsWith('.js')) {
+          res.setHeader('Content-Type', 'application/javascript');
+        }
+      }
+    }));
 
     const indexPath = path.join((process as any).cwd(), 'index.html');
     app.get('*', (req: ExpressRequest, res: Response, next: NextFunction) => {
-      if (req.path.startsWith('/api/')) {
+      if (req.path.startsWith('/api/')) { // API calls should not be handled by this
         return next();
+      }
+      // Do not log every asset request that might fall through here (e.g. favicons not present)
+      // Only log if it's likely a page route
+      if (!req.path.includes('.') || req.path.endsWith('.html')) {
+        console.log(`Wildcard GET: Path '${req.path}' not matched by other routes or static. Serving index.html.`);
       }
       res.sendFile(indexPath, (err: Error | null) => {
         if (err) {
+          console.error(`Error serving index.html for path ${req.path}:`, err);
           if (!res.headersSent) {
             const status = (err as any).status || 500;
             res.status(status).send('Error serving application.');
@@ -440,7 +469,9 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
       });
     });
 
+    // Fallback 404 for API routes not matched
     app.use('/api/*', (req: ExpressRequest, res: Response) => {
+      console.log(`API Fallback 404: ${req.method} ${req.originalUrl}`);
       res.status(404).json({ message: `API endpoint not found: ${req.method} ${req.originalUrl}` });
     });
 
@@ -469,3 +500,4 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
 }
 
 connectAndStartServer();
+    

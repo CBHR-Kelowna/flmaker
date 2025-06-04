@@ -1,5 +1,5 @@
 
-import express, { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
+import express, { Request as ExpressRequest, Response, NextFunction, ErrorRequestHandler } from 'express';
 import { Collection, Db, MongoClient, FindOptions, ObjectId } from 'mongodb'; // Added ObjectId and FindOptions
 import cors, { CorsOptions } from 'cors';
 import path from 'path';
@@ -35,7 +35,7 @@ if (!serviceAccountPathFromEnv) {
 }
 
 // Assign to a new constant after the check to ensure TypeScript infers it as string.
-const definiteServiceAccountPath: string = serviceAccountPathFromEnv!; // MODIFIED: Added non-null assertion
+const definiteServiceAccountPath: string = serviceAccountPathFromEnv!; 
 
 try {
     if (!fs.existsSync(definiteServiceAccountPath)) {
@@ -65,7 +65,7 @@ console.log("Google GenAI SDK initialized.");
 // --- End Gemini AI Initialization ---
 
 
-interface AuthenticatedRequest extends Request { // Extend express.Request
+interface AuthenticatedRequest extends ExpressRequest { // Extend aliased express.Request
   user?: admin.auth.DecodedIdToken;
 }
 
@@ -186,7 +186,9 @@ async function connectAndStartServer() {
     app.use('/api', authenticateToken); // All /api routes below are authenticated
 
     // User Profile Endpoints
+    console.log("Defining /api/user/profile GET route..."); // Diagnostic log
     app.get('/api/user/profile', async (req: AuthenticatedRequest, res: Response) => {
+        console.log("Request received for /api/user/profile GET"); // Diagnostic log
         const firebaseUID = req.user?.uid;
         if (!firebaseUID) {
             return res.status(403).json({ message: 'User UID not found in token.' });
@@ -216,7 +218,9 @@ async function connectAndStartServer() {
         }
     });
 
+    console.log("Defining /api/user/profile POST route..."); // Diagnostic log
     app.post('/api/user/profile', async (req: AuthenticatedRequest, res: Response) => {
+        console.log("Request received for /api/user/profile POST"); // Diagnostic log
         const firebaseUID = req.user?.uid;
         if (!firebaseUID) {
             return res.status(403).json({ message: 'User UID not found in token.' });
@@ -416,18 +420,13 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
 
 
     const distFrontendPath = path.join((process as any).cwd(), 'dist_frontend');
-    app.use('/dist_frontend', express.static(distFrontendPath, {
-        extensions: ['js'],
-        setHeaders: (res: NodeServerResponse, filePath: string) => {
-          if (filePath.endsWith('.js')) {
-            res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-          }
-        }
-      })
-    );
+    // Simplified express.static: removed 'extensions' and specific 'setHeaders' for .js,
+    // as Express usually handles MIME types for .js correctly.
+    // This helps rule out complex options as a source of the "text/html" MIME type error for index.js.
+    app.use('/dist_frontend', express.static(distFrontendPath));
 
     const indexPath = path.join((process as any).cwd(), 'index.html');
-    app.get('*', (req: Request, res: Response, next: NextFunction) => {
+    app.get('*', (req: ExpressRequest, res: Response, next: NextFunction) => {
       if (req.path.startsWith('/api/')) {
         return next();
       }
@@ -441,11 +440,11 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
       });
     });
 
-    app.use('/api/*', (req: Request, res: Response) => {
+    app.use('/api/*', (req: ExpressRequest, res: Response) => {
       res.status(404).json({ message: `API endpoint not found: ${req.method} ${req.originalUrl}` });
     });
 
-    const errorHandler: ErrorRequestHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
+    const errorHandler: ErrorRequestHandler = (err: any, req: ExpressRequest, res: Response, next: NextFunction) => {
       console.error("Unhandled error in errorHandler:", err.stack || err);
       if (res.headersSent) {
         return next(err);

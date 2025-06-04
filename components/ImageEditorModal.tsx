@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { default as Cropper } from 'react-easy-crop'; // Changed import
+import Cropper from 'react-easy-crop'; // Changed import
 import type { Point, Area, ImageEditState } from '../types.js'; // Assuming these types are correctly defined
 import { Button } from './Button.js';
 import { XMarkIcon } from './icons/XMarkIcon.js';

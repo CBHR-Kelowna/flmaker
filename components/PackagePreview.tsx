@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react'; // Added useState
 import JSZip from 'jszip';
 import saveAs from 'file-saver'; 
-import { ArrowDownTrayIcon } from './icons/ArrowDownTrayIcon.js';
-import { ArchiveBoxArrowDownIcon } from './icons/ArchiveBoxArrowDownIcon.js'; 
-import { Button } from './Button.js';
-import { LoadingIcon } from './icons/LoadingIcon.js';
+import { ArrowDownTrayIcon } from './icons/ArrowDownTrayIcon';
+import { ArchiveBoxArrowDownIcon } from './icons/ArchiveBoxArrowDownIcon'; 
+import { Button } from './Button';
+import { LoadingIcon } from './icons/LoadingIcon';
 
 
 interface PackagePreviewProps {

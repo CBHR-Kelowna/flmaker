@@ -28,7 +28,7 @@ const getEnvVar = (key, defaultValue = undefined) => {
 module.exports = {
   apps : [{
     name   : "featured-listing-maker",
-    script : "./server/dist/server/server.js",  // Path to the compiled server entry point
+    script : "./server/dist/server.js",  // Path to the compiled server entry point
     cwd    : "/var/www/featured-listing-maker/", // Current working directory FOR THE APP
                                                  // This is important so server.ts can find its own .env if needed
                                                  // and for relative paths within the app.
@@ -41,7 +41,6 @@ module.exports = {
       MONGODB_LISTINGS_COLLECTION: getEnvVar('MONGODB_LISTINGS_COLLECTION', 'Listings'),
       MONGODB_AGENTS_COLLECTION: getEnvVar('MONGODB_AGENTS_COLLECTION', 'Agents'),
       MONGODB_TEAMS_COLLECTION: getEnvVar('MONGODB_TEAMS_COLLECTION', 'Teams'),
-      MONGODB_USERPROFILES_COLLECTION: getEnvVar('MONGODB_USERPROFILES_COLLECTION', 'UserProfiles'), // Added
       GOOGLE_APPLICATION_CREDENTIALS: getEnvVar('GOOGLE_APPLICATION_CREDENTIALS'),
       API_KEY: getEnvVar('API_KEY')
       // Add any other environment variables your application needs

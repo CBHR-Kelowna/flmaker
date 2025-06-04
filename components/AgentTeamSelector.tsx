@@ -1,6 +1,7 @@
+
 import React from 'react';
-import type { Agent, Team } from '../types.js';
-import { Select } from './Select.js';
+import type { Agent, Team } from '../types';
+import { Select } from './Select';
 
 interface AgentTeamSelectorProps {
   agents: Agent[];

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { LoginForm } from './LoginForm.js';
-import { SignupForm } from './SignupForm.js';
-import { Button } from '../Button.js'; // Assuming Button component exists and is styled
+import { LoginForm } from './LoginForm';
+import { SignupForm } from './SignupForm';
+import { Button } from '../Button'; // Assuming Button component exists and is styled
 
 export const AuthPage: React.FC = () => {
   const [isLoginView, setIsLoginView] = useState(true);

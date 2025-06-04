@@ -9,8 +9,8 @@
     "strict": true, // Enable all strict type-checking options
     "forceConsistentCasingInFileNames": true, // Ensure that casing is correct in imports
     "noFallthroughCasesInSwitch": true, // Report errors for fallthrough cases in switch statement
-    "module": "node16", // Specify module code generation as Node16 for ESM output with "type":"module"
-    "moduleResolution": "node16", // Use node16 to ensure .js extensions in relative imports for browser
+    "module": "esnext", // Specify module code generation for modern browsers (supports dynamic imports)
+    "moduleResolution": "bundler", // Replicates how bundlers resolve modules, good for esm.sh
     "resolveJsonModule": true, // Include modules imported with .json extension
     "isolatedModules": true, // Ensure each file can be safely transpiled without relying on other imports
     "noEmit": false, // Allow JavaScript file generation
@@ -18,11 +18,10 @@
     "rootDir": ".", // Specify root directory of source files
     "jsx": "react-jsx", // Use the new JSX transform
     "baseUrl": ".", // Base directory to resolve non-absolute module names
-    "paths": {
-      "react-easy-crop": ["node_modules/@types/react-easy-crop"]
-    },
     "sourceMap": false // Explicitly disable source maps
+    // "paths" removed
+    // "types" removed
   },
   "include": ["./**/*.ts", "./**/*.tsx"], // Files to include in compilation
-  "exclude": ["node_modules", "server", "dist", "vite.config.ts", "dist_frontend"]
+  "exclude": ["node_modules", "server", "dist", "vite.config.ts", "dist_frontend"] // Added dist_frontend to exclude
 }

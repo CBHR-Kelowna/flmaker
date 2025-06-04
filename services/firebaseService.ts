@@ -1,7 +1,8 @@
 
-import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
-
+import { initializeApp } from 'firebase/app';
+import type { FirebaseApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import type { Auth } from 'firebase/auth';
 
 // IMPORTANT: Replace these with your actual Firebase project configuration values
 // These values are typically found in your Firebase project settings.

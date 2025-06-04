@@ -1,11 +1,12 @@
+
 import React, { useState, useCallback } from 'react';
-import Cropper from 'react-easy-crop'; // Changed import
-import type { Point, Area, ImageEditState } from '../types.js'; // Assuming these types are correctly defined
-import { Button } from './Button.js';
-import { XMarkIcon } from './icons/XMarkIcon.js';
-import { CheckIcon } from './icons/CheckIcon.js';
-import { ArrowPathIcon } from './icons/ArrowPathIcon.js'; // For reset
-import { ExclamationTriangleIcon } from './icons/ExclamationTriangleIcon.js';
+import Cropper from 'react-easy-crop';
+import type { Point, Area, ImageEditState } from '../types'; // Assuming these types are correctly defined
+import { Button } from './Button';
+import { XMarkIcon } from './icons/XMarkIcon';
+import { CheckIcon } from './icons/CheckIcon';
+import { ArrowPathIcon } from './icons/ArrowPathIcon'; // For reset
+import { ExclamationTriangleIcon } from './icons/ExclamationTriangleIcon';
 
 
 interface ImageEditorModalProps {

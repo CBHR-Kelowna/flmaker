@@ -1,7 +1,8 @@
+
 import React from 'react';
-import { Input } from './Input.js';
-import { Button } from './Button.js';
-import { MagnifyingGlassIcon } from './icons/MagnifyingGlassIcon.js';
+import { Input } from './Input';
+import { Button } from './Button';
+import { MagnifyingGlassIcon } from './icons/MagnifyingGlassIcon';
 
 interface SearchBarProps {
   onSearch: (mlsId: string) => void;

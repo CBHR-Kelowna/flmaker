@@ -1,5 +1,6 @@
+
 import React from 'react';
-import type { Listing } from '../types.js';
+import type { Listing } from '../types';
 
 interface PropertyDetailsProps {
   listing: Listing;
@@ -17,11 +18,14 @@ const getBedBathDisplayForDetails = (listing: Listing): string | null => {
     totalBaths += listing.BathroomsTotalInteger;
   }
   if (listing.BathroomsPartial && listing.BathroomsPartial > 0) {
-    totalBaths += listing.BathroomsPartial; 
+    totalBaths += listing.BathroomsPartial; // Simple sum as per previous logic
   }
   
   let bathsStr = "";
   if (totalBaths > 0) {
+    // Could be refined to show "2.5 Baths" if partial was treated as 0.5,
+    // but current AI logic sums them as whole numbers for "X Baths".
+    // For consistency in PropertyDetails, we'll do the same.
     bathsStr = `${totalBaths} Bath${totalBaths > 1 ? 's' : ''}`;
   }
 
@@ -32,15 +36,12 @@ const getBedBathDisplayForDetails = (listing: Listing): string | null => {
   } else if (bathsStr) {
     return bathsStr;
   }
-  return null;
+  return null; // No bed/bath info to display
 };
 
 
 export const PropertyDetails: React.FC<PropertyDetailsProps> = ({ listing }) => {
   const bedBathInfo = getBedBathDisplayForDetails(listing);
-  const displayAddress = listing.UnparsedAddress 
-    ? listing.UnparsedAddress 
-    : `${listing.StreetName}, ${listing.City}`;
 
   return (
     <div className="space-y-4 text-slate-700">
@@ -51,7 +52,7 @@ export const PropertyDetails: React.FC<PropertyDetailsProps> = ({ listing }) => 
         </div>
         <div>
           <p className="font-semibold">Address:</p>
-          <p>{displayAddress}</p>
+          <p>{listing.StreetName}, {listing.City}</p>
         </div>
         <div>
           <p className="font-semibold">Price:</p>
@@ -66,7 +67,7 @@ export const PropertyDetails: React.FC<PropertyDetailsProps> = ({ listing }) => 
           <p>{listing.OfficeName}</p>
         </div>
         {bedBathInfo && (
-          <div className="md:col-span-2">
+          <div className="md:col-span-2"> {/* Span across columns or place appropriately */}
             <p className="font-semibold">Features:</p>
             <p>{bedBathInfo}</p>
           </div>

@@ -1,8 +1,8 @@
 import React, { useState, FormEvent } from 'react';
-import { useAuth } from '../../contexts/AuthContext.js';
-import { Input } from '../Input.js';
-import { Button } from '../Button.js';
-import { LoadingIcon } from '../icons/LoadingIcon.js';
+import { useAuth } from '../../contexts/AuthContext';
+import { Input } from '../Input';
+import { Button } from '../Button';
+import { LoadingIcon } from '../icons/LoadingIcon';
 
 export const SignupForm: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -29,7 +29,7 @@ export const SignupForm: React.FC = () => {
           type="text"
           autoComplete="name"
           value={displayName}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDisplayName(e.target.value)}
+          onChange={(e) => setDisplayName(e.target.value)}
           className="mt-1"
           disabled={loading}
         />
@@ -45,7 +45,7 @@ export const SignupForm: React.FC = () => {
           autoComplete="email"
           required
           value={email}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+          onChange={(e) => setEmail(e.target.value)}
           className="mt-1"
           disabled={loading}
         />
@@ -62,7 +62,7 @@ export const SignupForm: React.FC = () => {
           autoComplete="new-password"
           required
           value={password}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+          onChange={(e) => setPassword(e.target.value)}
           className="mt-1"
           disabled={loading}
           minLength={6}

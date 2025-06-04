@@ -1,14 +1,14 @@
+
 {
   "name": "realty-social-packager-fullstack",
   "version": "1.0.0",
   "description": "Realty Social Packager with a Node.js backend",
-  "type": "module",
   "main": "server/server.ts",
   "scripts": {
     "build:frontend": "tsc -p ./tsconfig.json",
     "watch:frontend": "tsc -w -p ./tsconfig.json",
     "build:server": "tsc -p ./server/tsconfig.json",
-    "start:server": "node server/dist/server/server.js",
+    "start:server": "node server/dist/server.js",
     "dev:server": "nodemon",
     "dev": "concurrently --kill-others-on-fail \"npm:watch:frontend\" \"wait-on ./dist_frontend/index.js && npm:dev:server\""
   },
@@ -30,7 +30,7 @@
     "@types/node": "^20.14.2",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@types/react-easy-crop": "5.0.0",
+    "@types/react-easy-crop": "^2.0.0",
     "@types/file-saver": "^2.0.7",
     "@types/jszip": "^3.4.1",
     "concurrently": "^8.2.2",

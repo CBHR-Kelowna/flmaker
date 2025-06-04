@@ -1,16 +1,15 @@
+
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import type { Auth, User } from 'firebase/auth';
 import { 
-  type User, 
-  type Auth, 
-  onAuthStateChanged, 
   createUserWithEmailAndPassword, 
-  updateProfile, 
   signInWithEmailAndPassword, 
   signOut, 
-  sendPasswordResetEmail as firebaseSendPasswordResetEmail // Aliased import
-} from 'firebase/auth'; 
-
-import { auth as firebaseAuthService } from '../services/firebaseService.js'; 
+  onAuthStateChanged,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
+  updateProfile
+} from 'firebase/auth';
+import { auth as firebaseAuthService } from '../services/firebaseService'; // Assuming firebaseService exports auth
 
 interface AuthContextType {
   currentUser: User | null;
@@ -97,12 +96,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // This is the local context method
   const sendPasswordResetEmail = async (email: string) => {
     setError(null);
     try {
-      // Call the aliased Firebase function with both auth instance and email
-      await firebaseSendPasswordResetEmail(firebaseAuthService, email); 
+      await firebaseSendPasswordResetEmail(firebaseAuthService, email);
     } catch (err: any) {
       setError(err.message || "Failed to send password reset email.");
       console.error("Password Reset Error:", err);

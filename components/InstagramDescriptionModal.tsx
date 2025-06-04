@@ -1,11 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
-import type { Listing } from '../types.js';
-import { Button } from './Button.js';
-import { LoadingIcon } from './icons/LoadingIcon.js';
-import { XMarkIcon } from './icons/XMarkIcon.js';
-import { ClipboardDocumentIcon } from './icons/ClipboardDocumentIcon.js';
-import { SparklesIcon } from './icons/SparklesIcon.js'; // Assuming you have this or similar
-import { generateInstagramPostDescription } from '../services/aiService.js';
+import type { Listing } from '../types';
+import { Button } from './Button';
+import { LoadingIcon } from './icons/LoadingIcon';
+import { XMarkIcon } from './icons/XMarkIcon';
+import { ClipboardDocumentIcon } from './icons/ClipboardDocumentIcon';
+import { SparklesIcon } from './icons/SparklesIcon'; // Assuming you have this or similar
+import { generateInstagramPostDescription } from '../services/aiService';
 
 interface InstagramDescriptionModalProps {
   isOpen: boolean;

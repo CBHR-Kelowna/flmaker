@@ -1,4 +1,6 @@
-import type { Area, GeneratePackageParams, ImageEditState, ProcessedPackageResult, ImageAnalysisResult } from '../types.js';
+
+
+import type { Area, GeneratePackageParams, ImageEditState, ProcessedPackageResult, ImageAnalysisResult } from '../types';
 
 // Declare Uploadcare and Jimp global variables for TypeScript
 declare var uploadcare: any;

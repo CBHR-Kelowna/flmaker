@@ -1,12 +1,11 @@
-
 import React, { useEffect, useState } from 'react';
-import type { UserProfile, Listing } from '../../types';
+import type { UserProfile, Listing } from '../../types.js';
 import type { User as FirebaseUser } from 'firebase/auth'; 
-import { fetchAgentListings } from '../../services/userService';
-import { Button } from '../Button';
-import { LoadingIcon } from '../icons/LoadingIcon';
-import { ExclamationTriangleIcon } from '../icons/ExclamationTriangleIcon';
-import { PhotoIcon } from '../icons/PhotoIcon'; // Placeholder for listing card image
+import { fetchAgentListings } from '../../services/userService.js';
+import { Button } from '../Button.js';
+import { LoadingIcon } from '../icons/LoadingIcon.js';
+import { ExclamationTriangleIcon } from '../icons/ExclamationTriangleIcon.js';
+import { PhotoIcon } from '../icons/PhotoIcon.js'; // Placeholder for listing card image
 
 interface DashboardPageProps {
   currentUser: FirebaseUser; 

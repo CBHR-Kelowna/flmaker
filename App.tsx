@@ -1,26 +1,24 @@
-
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from './contexts/AuthContext';
-import type { UserProfile } from './types';
+import { useAuth } from './contexts/AuthContext.js';
+import type { UserProfile } from './types.js';
 // Assuming User type would be resolved via firebaseAuth.User if direct import fails,
 // but will keep direct type import for now as per strategy.
 // If 'User' is not found, this will still be an error, namespacing mostly helps values.
 import type { User as FirebaseUser } from 'firebase/auth'; // Ensured User type import
-import { fetchUserProfile } from './services/userService';
+import { fetchUserProfile } from './services/userService.js';
 
-import { AuthPage } from './components/auth/AuthPage';
-import { DashboardPage } from './components/pages/DashboardPage';
-import { CreateListingPage } from './components/pages/CreateListingPage';
-import { ProfilePage } from './components/pages/ProfilePage';
+import { AuthPage } from './components/auth/AuthPage.js';
+import { DashboardPage } from './components/pages/DashboardPage.js';
+import { CreateListingPage } from './components/pages/CreateListingPage.js';
+import { ProfilePage } from './components/pages/ProfilePage.js';
 
-import { LoadingIcon } from './components/icons/LoadingIcon';
-import { Button } from './components/Button';
-import { UserCircleIcon } from './components/icons/UserCircleIcon';
-import { ArrowLeftOnRectangleIcon } from './components/icons/ArrowLeftOnRectangleIcon';
-import { HomeIcon } from './components/icons/HomeIcon'; // For Dashboard
-import { PlusCircleIcon } from './components/icons/PlusCircleIcon'; // For Create New
-import { Cog6ToothIcon } from './components/icons/Cog6ToothIcon'; // For Profile
+import { LoadingIcon } from './components/icons/LoadingIcon.js';
+import { Button } from './components/Button.js';
+import { UserCircleIcon } from './components/icons/UserCircleIcon.js';
+import { ArrowLeftOnRectangleIcon } from './components/icons/ArrowLeftOnRectangleIcon.js';
+import { HomeIcon } from './components/icons/HomeIcon.js'; // For Dashboard
+import { PlusCircleIcon } from './components/icons/PlusCircleIcon.js'; // For Create New
+import { Cog6ToothIcon } from './components/icons/Cog6ToothIcon.js'; // For Profile
 
 const App: React.FC = () => {
   const { currentUser, loading: authLoading, logout, error: authError } = useAuth();

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { 
   type User, 
@@ -11,7 +10,7 @@ import {
   sendPasswordResetEmail as firebaseSendPasswordResetEmail // Aliased import
 } from 'firebase/auth'; 
 
-import { auth as firebaseAuthService } from '../services/firebaseService'; 
+import { auth as firebaseAuthService } from '../services/firebaseService.js'; 
 
 interface AuthContextType {
   currentUser: User | null;

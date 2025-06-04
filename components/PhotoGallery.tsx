@@ -1,11 +1,9 @@
-
-
 import React from 'react';
-import type { ImageEditState, ImageAnalysisResult } from '../types';
-import { PhotoIcon } from './icons/PhotoIcon';
-import { PencilSquareIcon } from './icons/PencilSquareIcon';
-import { CheckCircleIcon } from './icons/CheckCircleIcon';
-import { ExclamationTriangleIcon } from './icons/ExclamationTriangleIcon';
+import type { ImageEditState, ImageAnalysisResult } from '../types.js';
+import { PhotoIcon } from './icons/PhotoIcon.js';
+import { PencilSquareIcon } from './icons/PencilSquareIcon.js';
+import { CheckCircleIcon } from './icons/CheckCircleIcon.js';
+import { ExclamationTriangleIcon } from './icons/ExclamationTriangleIcon.js';
 
 interface PhotoGalleryProps {
   photos: string[];

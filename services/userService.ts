@@ -1,6 +1,5 @@
-
-import type { UserProfile, Listing } from '../types';
-import { auth } from './firebaseService'; 
+import type { UserProfile, Listing } from '../types.js';
+import { auth } from './firebaseService.js'; 
 
 const API_BASE_URL = 'https://fl.kelownarealestate.com/api'; 
 

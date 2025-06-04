@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect, FormEvent } from 'react';
-import type { UserProfile } from '../../types';
-import { updateUserProfile as apiUpdateUserProfile } from '../../services/userService';
-import { Input } from '../Input';
-import { Button } from '../Button';
-import { LoadingIcon } from '../icons/LoadingIcon';
+import type { UserProfile } from '../../types.js';
+import { updateUserProfile as apiUpdateUserProfile } from '../../services/userService.js';
+import { Input } from '../Input.js';
+import { Button } from '../Button.js';
+import { LoadingIcon } from '../icons/LoadingIcon.js';
 
 interface ProfilePageProps {
   userProfile: UserProfile | null;
@@ -74,7 +73,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ userProfile, onProfile
               type="text"
               id="agentKey"
               value={agentKeyInput}
-              onChange={(e) => setAgentKeyInput(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgentKeyInput(e.target.value)}
               placeholder="Enter your MLS Agent Key (e.g., KEL012345)"
               className="w-full"
               disabled={isLoading}

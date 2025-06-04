@@ -1,6 +1,5 @@
-
-import type { Listing } from '../types';
-import { auth } from './firebaseService'; // Import Firebase auth instance
+import type { Listing } from '../types.js';
+import { auth } from './firebaseService.js'; // Import Firebase auth instance
 
 const API_BASE_URL = 'https://fl.kelownarealestate.com/api'; // Or your actual API base URL
 

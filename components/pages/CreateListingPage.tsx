@@ -1,22 +1,21 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import type { UserProfile, Listing, Agent, Team, ImageEditState, Area, Point, GeneratePackageParams, ImageAnalysisResult, ProcessedPackageResult } from '../../types';
+import type { UserProfile, Listing, Agent, Team, ImageEditState, Area, Point, GeneratePackageParams, ImageAnalysisResult, ProcessedPackageResult } from '../../types.js';
 import type { User as FirebaseUser } from 'firebase/auth'; 
 
-import { SearchBar } from '../SearchBar';
-import { PropertyDetails } from '../PropertyDetails';
-import { PhotoGallery } from '../PhotoGallery';
-import { AgentTeamSelector } from '../AgentTeamSelector';
-import { PackagePreview } from '../PackagePreview';
-import { ImageEditorModal } from '../ImageEditorModal';
-import { InstagramDescriptionModal } from '../InstagramDescriptionModal';
-import { LoadingIcon } from '../icons/LoadingIcon';
-import { Button } from '../Button';
-import { SparklesIcon } from '../icons/SparklesIcon';
+import { SearchBar } from '../SearchBar.js';
+import { PropertyDetails } from '../PropertyDetails.js';
+import { PhotoGallery } from '../PhotoGallery.js';
+import { AgentTeamSelector } from '../AgentTeamSelector.js';
+import { PackagePreview } from '../PackagePreview.js';
+import { ImageEditorModal } from '../ImageEditorModal.js';
+import { InstagramDescriptionModal } from '../InstagramDescriptionModal.js';
+import { LoadingIcon } from '../icons/LoadingIcon.js';
+import { Button } from '../Button.js';
+import { SparklesIcon } from '../icons/SparklesIcon.js';
 
-import { fetchListing as apiFetchListing } from '../../services/listingService';
-import { fetchAgents as apiFetchAgents, fetchTeams as apiFetchTeams } from '../../services/assetService';
-import { generateClientSidePackage, analyzeImageDimensionsAndStrips } from '../../services/imageProcessingService';
+import { fetchListing as apiFetchListing } from '../../services/listingService.js';
+import { fetchAgents as apiFetchAgents, fetchTeams as apiFetchTeams } from '../../services/assetService.js';
+import { generateClientSidePackage, analyzeImageDimensionsAndStrips } from '../../services/imageProcessingService.js';
 
 const MAX_IMAGE_SELECTIONS = 10;
 const TARGET_DIMENSION = 1080;
@@ -123,7 +122,7 @@ export const CreateListingPage: React.FC<CreateListingPageProps> = ({ currentUse
       const fetchedListing = await apiFetchListing(mlsId.trim());
       setListing(fetchedListing);
       if (fetchedListing?.PhotoGallery) {
-        const urls = fetchedListing.PhotoGallery.split(' ').filter(u => u.trim() !== '' && IMAGE_URL_REGEX.test(u));
+        const urls = fetchedListing.PhotoGallery.split(' ').filter((u: string) => u.trim() !== '' && IMAGE_URL_REGEX.test(u));
         performInitialImageAnalysis(urls);
       }
     } catch (err: any) {

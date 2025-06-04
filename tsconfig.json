@@ -9,7 +9,7 @@
     "strict": true, // Enable all strict type-checking options
     "forceConsistentCasingInFileNames": true, // Ensure that casing is correct in imports
     "noFallthroughCasesInSwitch": true, // Report errors for fallthrough cases in switch statement
-    "module": "esnext", // Specify module code generation for modern browsers (supports dynamic imports)
+    "module": "nodenext", // Specify module code generation for modern browsers (supports dynamic imports) - CHANGED
     "moduleResolution": "nodenext", // CHANGED FROM "bundler" - Key change for .js extensions
     "resolveJsonModule": true, // Include modules imported with .json extension
     "isolatedModules": true, // Ensure each file can be safely transpiled without relying on other imports

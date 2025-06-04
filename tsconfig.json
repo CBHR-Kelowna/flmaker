@@ -18,6 +18,9 @@
     "rootDir": ".", // Specify root directory of source files
     "jsx": "react-jsx", // Use the new JSX transform
     "baseUrl": ".", // Base directory to resolve non-absolute module names
+    "paths": {
+      "react-easy-crop": ["node_modules/@types/react-easy-crop"]
+    },
     "sourceMap": false // Explicitly disable source maps
   },
   "include": ["./**/*.ts", "./**/*.tsx"], // Files to include in compilation

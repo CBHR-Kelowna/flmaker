@@ -31,16 +31,16 @@ const serviceAccountPathFromEnv = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 if (!serviceAccountPathFromEnv) {
     console.error("FATAL ERROR: GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.");
-    (process as any).exit(1); 
+    (process as any).exit(1);
 }
 
 // Assign to a new constant after the check to ensure TypeScript infers it as string.
-const definiteServiceAccountPath: string = serviceAccountPathFromEnv;
+const definiteServiceAccountPath: string = serviceAccountPathFromEnv!; // MODIFIED: Added non-null assertion
 
 try {
-    if (!fs.existsSync(definiteServiceAccountPath)) { 
+    if (!fs.existsSync(definiteServiceAccountPath)) {
         console.error(`FATAL ERROR: Service account key file not found at path: ${definiteServiceAccountPath}`);
-        (process as any).exit(1); 
+        (process as any).exit(1);
     }
     const serviceAccountFileContent = fs.readFileSync(definiteServiceAccountPath, 'utf8');
     const serviceAccount = JSON.parse(serviceAccountFileContent);
@@ -50,7 +50,7 @@ try {
     console.log("Firebase Admin SDK initialized successfully.");
 } catch (error: any) {
     console.error(`Firebase Admin SDK initialization failed: ${error.message}. Path used: ${definiteServiceAccountPath}`);
-    (process as any).exit(1); 
+    (process as any).exit(1);
 }
 // --- End Firebase Admin SDK Initialization ---
 
@@ -58,7 +58,7 @@ try {
 const apiKey = process.env.API_KEY;
 if (!apiKey) {
   console.error('FATAL ERROR: API_KEY for Gemini AI is not defined. Check .env file and PM2 configuration.');
-  (process as any).exit(1); 
+  (process as any).exit(1);
 }
 const ai = new GoogleGenAI({ apiKey });
 console.log("Google GenAI SDK initialized.");
@@ -69,7 +69,7 @@ interface AuthenticatedRequest extends Request { // Extend express.Request
   user?: admin.auth.DecodedIdToken;
 }
 
-const app = express(); 
+const app = express();
 const port = process.env.PORT || 3001;
 
 const allowedOrigins = [
@@ -116,7 +116,7 @@ const userProfilesCollectionName = process.env.MONGODB_USERPROFILES_COLLECTION |
 
 if (!mongoUri || !dbName) {
   console.error('FATAL ERROR: MONGODB_URI or MONGODB_DB_NAME is not defined.');
-  (process as any).exit(1); 
+  (process as any).exit(1);
 }
 
 const client = new MongoClient(mongoUri!);
@@ -186,9 +186,8 @@ async function connectAndStartServer() {
     app.use('/api', authenticateToken); // All /api routes below are authenticated
 
     // User Profile Endpoints
-    app.get('/api/user/profile', async (req: Request, res: Response) => {
-        const authReq = req as AuthenticatedRequest;
-        const firebaseUID = authReq.user?.uid;
+    app.get('/api/user/profile', async (req: AuthenticatedRequest, res: Response) => {
+        const firebaseUID = req.user?.uid;
         if (!firebaseUID) {
             return res.status(403).json({ message: 'User UID not found in token.' });
         }
@@ -199,8 +198,8 @@ async function connectAndStartServer() {
                 const newUserProfileData: UserProfile = {
                     firebaseUID,
                     agentKey: null,
-                    email: authReq.user?.email || '',
-                    displayName: authReq.user?.name || authReq.user?.displayName || null,
+                    email: req.user?.email || '',
+                    displayName: req.user?.name || req.user?.displayName || null,
                 };
                 const insertResult = await userProfilesCollection.insertOne(newUserProfileData);
                 userProfileDoc = { // Construct the document as if it were found, including the new _id
@@ -217,9 +216,8 @@ async function connectAndStartServer() {
         }
     });
 
-    app.post('/api/user/profile', async (req: Request, res: Response) => {
-        const authReq = req as AuthenticatedRequest;
-        const firebaseUID = authReq.user?.uid;
+    app.post('/api/user/profile', async (req: AuthenticatedRequest, res: Response) => {
+        const firebaseUID = req.user?.uid;
         if (!firebaseUID) {
             return res.status(403).json({ message: 'User UID not found in token.' });
         }
@@ -231,8 +229,8 @@ async function connectAndStartServer() {
         try {
             const updateData: Partial<UserProfile> = {
                 agentKey: agentKey, // Allow setting to null
-                email: authReq.user?.email || '', // Keep email and displayName updated
-                displayName: authReq.user?.name || authReq.user?.displayName || null,
+                email: req.user?.email || '', // Keep email and displayName updated
+                displayName: req.user?.name || req.user?.displayName || null,
             };
 
             const result = await userProfilesCollection.findOneAndUpdate(
@@ -240,9 +238,9 @@ async function connectAndStartServer() {
                 { $set: updateData },
                 { upsert: true, returnDocument: 'after' }
             );
-            if (result) { 
+            if (result) {
                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const { _id, ...profileData } = result as any; 
+                const { _id, ...profileData } = result as any;
                 res.json(profileData);
             } else {
                 console.error('User profile update/creation failed to return a document, which is unexpected.');
@@ -255,9 +253,8 @@ async function connectAndStartServer() {
     });
 
     // Agent Listings Endpoint (for Dashboard)
-    app.get('/api/agent-listings', async (req: Request, res: Response) => {
-        const authReq = req as AuthenticatedRequest;
-        const firebaseUID = authReq.user?.uid;
+    app.get('/api/agent-listings', async (req: AuthenticatedRequest, res: Response) => {
+        const firebaseUID = req.user?.uid;
 
         if (!firebaseUID) {
             return res.status(403).json({ message: "User UID not found." });
@@ -276,7 +273,7 @@ async function connectAndStartServer() {
             };
             const options: FindOptions = {
                 projection: { PhotoGallery: 1, UnparsedAddress: 1, StreetName: 1, City: 1, ListPrice: 1, ListingId: 1, BedroomsTotal:1, BathroomsTotalInteger:1, BathroomsPartial:1  },
-                limit: 50 
+                limit: 50
             };
             const listings = await listingsCollection.find(query, options).toArray();
 
@@ -294,7 +291,7 @@ async function connectAndStartServer() {
     });
 
 
-    app.get('/api/listings/:mlsId', async (req: Request, res: Response) => {
+    app.get('/api/listings/:mlsId', async (req: AuthenticatedRequest, res: Response) => {
       const { mlsId } = req.params;
       try {
         const listing = await listingsCollection.findOne({ ListingId: mlsId });
@@ -311,7 +308,7 @@ async function connectAndStartServer() {
       }
     });
 
-    app.get('/api/agents', async (req: Request, res: Response) => {
+    app.get('/api/agents', async (req: AuthenticatedRequest, res: Response) => {
       try {
         const agents = await agentsCollection.find({}).toArray();
         const mappedAgents = agents.map(agentDoc => {
@@ -326,7 +323,7 @@ async function connectAndStartServer() {
       }
     });
 
-    app.get('/api/teams', async (req: Request, res: Response) => {
+    app.get('/api/teams', async (req: AuthenticatedRequest, res: Response) => {
       try {
         const teams = await teamsCollection.find({}).toArray();
         const mappedTeams = teams.map(teamDoc => {
@@ -341,9 +338,8 @@ async function connectAndStartServer() {
       }
     });
 
-    app.post('/api/generate-instagram-description', async (req: Request, res: Response) => {
-        const authReq = req as AuthenticatedRequest;
-        console.log(`User ${authReq.user?.uid} requesting Instagram description generation.`);
+    app.post('/api/generate-instagram-description', async (req: AuthenticatedRequest, res: Response) => {
+        console.log(`User ${req.user?.uid} requesting Instagram description generation.`);
         const { listing, agentName } = req.body as { listing: Listing, agentName: string | null };
 
         if (!listing) {
@@ -422,7 +418,7 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
     const distFrontendPath = path.join((process as any).cwd(), 'dist_frontend');
     app.use('/dist_frontend', express.static(distFrontendPath, {
         extensions: ['js'],
-        setHeaders: (res: NodeServerResponse, filePath: string) => { 
+        setHeaders: (res: NodeServerResponse, filePath: string) => {
           if (filePath.endsWith('.js')) {
             res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
           }
@@ -435,10 +431,10 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
       if (req.path.startsWith('/api/')) {
         return next();
       }
-      res.sendFile(indexPath, (err: Error | null) => { 
+      res.sendFile(indexPath, (err: Error | null) => {
         if (err) {
           if (!res.headersSent) {
-            const status = (err as any).status || 500; 
+            const status = (err as any).status || 500;
             res.status(status).send('Error serving application.');
           }
         }
@@ -469,7 +465,7 @@ ${bedBathTextFormatted ? `The property has features: ${bedBathTextFormatted}.` :
 
   } catch (err) {
     console.error(`Server startup failed:`, err);
-    (process as any).exit(1); 
+    (process as any).exit(1);
   }
 }
 

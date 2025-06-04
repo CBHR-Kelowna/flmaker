@@ -6,6 +6,7 @@ export interface Listing {
   ListAgentKey: string;
   City: string;
   StreetName: string;
+  UnparsedAddress?: string; // New field for full address
   ListPrice: number;
   PublicRemarks: string;
   PhotoGallery: string; // Space-separated URLs

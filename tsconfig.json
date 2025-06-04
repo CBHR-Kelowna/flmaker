@@ -9,8 +9,8 @@
     "strict": true, // Enable all strict type-checking options
     "forceConsistentCasingInFileNames": true, // Ensure that casing is correct in imports
     "noFallthroughCasesInSwitch": true, // Report errors for fallthrough cases in switch statement
-    "module": "nodenext", // Specify module code generation for modern browsers (supports dynamic imports) - CHANGED
-    "moduleResolution": "nodenext", // CHANGED FROM "bundler" - Key change for .js extensions
+    "module": "es2022", // Specify module code generation as ES2022 for browser compatibility
+    "moduleResolution": "node16", // Use node16 to ensure .js extensions in relative imports for browser
     "resolveJsonModule": true, // Include modules imported with .json extension
     "isolatedModules": true, // Ensure each file can be safely transpiled without relying on other imports
     "noEmit": false, // Allow JavaScript file generation
@@ -19,9 +19,7 @@
     "jsx": "react-jsx", // Use the new JSX transform
     "baseUrl": ".", // Base directory to resolve non-absolute module names
     "sourceMap": false // Explicitly disable source maps
-    // "paths" removed
-    // "types" removed
   },
   "include": ["./**/*.ts", "./**/*.tsx"], // Files to include in compilation
-  "exclude": ["node_modules", "server", "dist", "vite.config.ts", "dist_frontend"] // Added dist_frontend to exclude
+  "exclude": ["node_modules", "server", "dist", "vite.config.ts", "dist_frontend"]
 }
